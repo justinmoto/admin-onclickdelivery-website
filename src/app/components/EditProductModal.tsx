@@ -36,7 +36,7 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
       name: productName,
       price: parseFloat(productPrice) || 0,
       size: productSize || undefined,
-      photo: productPhoto
+      photo: productPhoto || undefined
     });
     onClose();
   };
