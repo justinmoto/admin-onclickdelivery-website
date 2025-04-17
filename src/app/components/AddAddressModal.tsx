@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
 import usePlacesAutocomplete, {
   getGeocode,
@@ -10,7 +11,13 @@ import usePlacesAutocomplete, {
 interface AddAddressModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (address: { tradeName: string; category: string; address: string; coordinates?: { lat: number; lng: number } }) => void;
+  onSave: (address: { 
+    tradeName: string; 
+    category: string; 
+    address: string; 
+    coordinates?: { lat: number; lng: number };
+    logo?: File;
+  }) => void;
 }
 
 interface AddressForm {
@@ -21,14 +28,38 @@ interface AddressForm {
     lat: number;
     lng: number;
   } | null;
+  logo: File | null;
+  logoPreview: string | null;
 }
+
+const STORE_CATEGORIES = [
+  "Restaurant",
+  "Cafe",
+  "Fast Food",
+  "Bakery",
+  "Grocery Store",
+  "Convenience Store",
+  "Pharmacy",
+  "Electronics Store",
+  "Clothing Store",
+  "Hardware Store",
+  "Bookstore",
+  "Pet Shop",
+  "Flower Shop",
+  "Jewelry Store",
+  "Sports Store",
+  "Toy Store",
+  "Other"
+];
 
 export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProps) => {
   const [form, setForm] = useState<AddressForm>({
     tradeName: '',
     category: '',
     address: '',
-    coordinates: null
+    coordinates: null,
+    logo: null,
+    logoPreview: null
   });
 
   // Load Google Maps script
@@ -131,13 +162,25 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
     );
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setForm(prev => ({
+        ...prev,
+        logo: file,
+        logoPreview: URL.createObjectURL(file)
+      }));
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
       tradeName: form.tradeName,
       category: form.category,
       address: form.address,
-      coordinates: form.coordinates || undefined
+      coordinates: form.coordinates || undefined,
+      logo: form.logo || undefined
     });
     onClose();
   };
@@ -163,6 +206,49 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
 
         <div className="flex-1 overflow-y-auto p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Logo Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Store Logo
+              </label>
+              <div 
+                onClick={() => document.getElementById('logo-upload')?.click()}
+                className="relative cursor-pointer group"
+              >
+                <div className={`w-24 h-24 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors ${form.logoPreview ? 'border-none' : ''}`}>
+                  {form.logoPreview ? (
+                    <div className="relative w-full h-full rounded-full overflow-hidden">
+                      <Image
+                        src={form.logoPreview}
+                        alt="Store logo preview"
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </div>
+                    </div>
+                  ) : (
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </div>
+                <input
+                  id="logo-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+                <p className="mt-1 text-xs text-gray-500 text-center">
+                  {form.logo ? form.logo.name : 'Click to upload logo'}
+                </p>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Trade Name
@@ -180,13 +266,18 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Category
               </label>
-              <input
-                type="text"
+              <select
                 value={form.category}
                 onChange={(e) => setForm(prev => ({ ...prev, category: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
-                placeholder="Enter category"
-              />
+              >
+                <option value="">Select a category</option>
+                {STORE_CATEGORIES.map(category => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-4">

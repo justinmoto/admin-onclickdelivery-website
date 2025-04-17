@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
 import { AddProductModal } from '../components/AddProductModal';
@@ -7,6 +7,8 @@ import { AddAddressModal } from '../components/AddAddressModal';
 import { ImportExcelModal } from '../components/ImportExcelModal';
 import { AddMenuPhotosModal } from '../components/AddMenuPhotosModal';
 import { DeliverySettingsModal } from '../components/DeliverySettingsModal';
+import { EditProductModal } from '../components/EditProductModal';
+import { Toast } from '../components/Toast';
 
 interface Store {
   id: string;
@@ -16,6 +18,7 @@ interface Store {
   isPhotoMenu: boolean;
   products: Product[];
   menuPhotos?: MenuPhoto[];
+  category?: string;
 }
 
 interface DeliveryFare {
@@ -28,6 +31,7 @@ interface Product {
   name: string;
   price: number;
   size?: string;
+  photo?: string;
 }
 
 interface MenuPhoto {
@@ -44,45 +48,33 @@ export default function Addresses() {
   const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false);
   const [isAddMenuPhotosModalOpen, setIsAddMenuPhotosModalOpen] = useState(false);
   const [isDeliverySettingsModalOpen, setIsDeliverySettingsModalOpen] = useState(false);
-  const [stores] = useState<Store[]>([
-    {
-      id: '1',
-      name: "11:11 Cafe",
-      location: "Apokon",
-      isPhotoMenu: true,
-      products: [],
-      menuPhotos: [
-        { id: 1, url: '/menu-photos/menu1.jpg', thumbnail: '/menu-photos/menu1-thumb.jpg' },
-        { id: 2, url: '/menu-photos/menu2.jpg', thumbnail: '/menu-photos/menu2-thumb.jpg' }
-      ]
-    },
-    {
-      id: '2',
-      name: "8's Yummy",
-      location: "Tagum City",
-      isPhotoMenu: false,
-      products: []
-    },
-    {
-      id: '3',
-      name: "Alberto's Pizza",
-      location: "Tagum City",
-      logo: "/store-logos/albertos.png",
-      isPhotoMenu: false,
-      products: [
-        { name: "All Meat", size: "11\"", price: 260.00 },
-        { name: "All Meat", size: "9\"", price: 190.00 },
-        { name: "Anchovy Pizza", size: "11\"", price: 270.00 },
-        { name: "Anchovy Pizza", size: "9\"", price: 230.00 },
-        { name: "Bacon Cheeseburger", size: "11\"", price: 270.00 }
-      ]
-    },
-    // ... other stores remain the same
-  ]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<{ index: number; product: Product } | null>(null);
+  const [isEditProductModalOpen, setIsEditProductModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isToastVisible, setIsToastVisible] = useState(false);
+  const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
+  const [nextId, setNextId] = useState(1);
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openMenuIndex !== null) {
+        const menu = document.getElementById(`product-menu-${openMenuIndex}`);
+        if (menu && !menu.contains(event.target as Node)) {
+          setOpenMenuIndex(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openMenuIndex]);
 
   const handleImportExcel = (file: File) => {
     console.log('Importing Excel file:', file);
@@ -90,33 +82,200 @@ export default function Addresses() {
   };
 
   const handleTogglePhotoMenu = (store: Store) => {
-    const updatedStore = { ...store, isPhotoMenu: !store.isPhotoMenu };
-    // Update store in stores array
-    setSelectedStore(updatedStore);
-  };
-
-  const handleAddMorePhotos = () => {
-    console.log('Add more photos clicked');
+    const updatedStores = stores.map(s => {
+      if (s.id === store.id) {
+        return { ...s, isPhotoMenu: !s.isPhotoMenu };
+      }
+      return s;
+    });
+    setStores(updatedStores);
+    setSelectedStore(prevStore => 
+      prevStore ? { ...prevStore, isPhotoMenu: !prevStore.isPhotoMenu } : null
+    );
   };
 
   const handleAddProduct = (product: { name: string; price: number; photo?: File }) => {
-    console.log('Adding product:', product);
-    // Implementation for adding product
-  };
+    if (!selectedStore) return;
+    
+    const newProduct = {
+      name: product.name,
+      price: product.price,
+      photo: product.photo ? URL.createObjectURL(product.photo) : undefined
+    };
 
-  const handleAddAddress = (address: { tradeName: string; category: string; address: string }) => {
-    console.log('Adding address:', address);
-    // Implementation for adding address
+    const updatedStores = stores.map(store => {
+      if (store.id === selectedStore.id) {
+        return {
+          ...store,
+          products: [...store.products, newProduct]
+        };
+      }
+      return store;
+    });
+
+    setStores(updatedStores);
+    setSelectedStore(prevStore => 
+      prevStore ? {
+        ...prevStore,
+        products: [...prevStore.products, newProduct]
+      } : null
+    );
+    setIsAddProductModalOpen(false);
+    showToast('Product added successfully!');
   };
 
   const handleAddMenuPhotos = (photos: File[]) => {
-    console.log('Adding menu photos:', photos);
-    // Implementation for adding menu photos
+    if (!selectedStore) return;
+
+    // Get the current highest photo ID or start from 0
+    const currentHighestId = selectedStore.menuPhotos?.length ?? 0;
+
+    // Create temporary URLs for the uploaded photos with sequential IDs
+    const newPhotos = photos.map((photo, index) => ({
+      id: currentHighestId + index + 1, // Start from next number
+      url: URL.createObjectURL(photo),
+      thumbnail: URL.createObjectURL(photo)
+    }));
+
+    const updatedStores = stores.map(store => {
+      if (store.id === selectedStore.id) {
+        return {
+          ...store,
+          menuPhotos: [...(store.menuPhotos || []), ...newPhotos]
+        };
+      }
+      return store;
+    });
+
+    setStores(updatedStores);
+    setSelectedStore(prevStore => 
+      prevStore ? {
+        ...prevStore,
+        menuPhotos: [...(prevStore.menuPhotos || []), ...newPhotos]
+      } : null
+    );
+    setIsAddMenuPhotosModalOpen(false);
+    showToast(`${photos.length} menu photo${photos.length > 1 ? 's' : ''} added successfully!`);
+  };
+
+  const handleRemovePhoto = (photoId: number) => {
+    if (!selectedStore) return;
+
+    const updatedStores = stores.map(store => {
+      if (store.id === selectedStore.id) {
+        return {
+          ...store,
+          menuPhotos: store.menuPhotos?.filter(photo => photo.id !== photoId)
+        };
+      }
+      return store;
+    });
+
+    setStores(updatedStores);
+    setSelectedStore(prevStore => 
+      prevStore ? {
+        ...prevStore,
+        menuPhotos: prevStore.menuPhotos?.filter(photo => photo.id !== photoId)
+      } : null
+    );
+  };
+
+  const handleAddAddress = (address: { 
+    tradeName: string; 
+    category: string; 
+    address: string; 
+    coordinates?: { lat: number; lng: number };
+    logo?: File;
+  }) => {
+    const newStore: Store = {
+      id: nextId.toString(),
+      name: address.tradeName,
+      location: address.address,
+      category: address.category,
+      logo: address.logo ? URL.createObjectURL(address.logo) : undefined,
+      isPhotoMenu: false,
+      products: [],
+      menuPhotos: []
+    };
+
+    setStores(prevStores => [...prevStores, newStore]);
+    setNextId(prevId => prevId + 1);
+    setIsAddAddressModalOpen(false);
+    showToast('Store added successfully!');
   };
 
   const handleSaveDeliverySettings = (settings: DeliveryFare) => {
     console.log('Saving delivery settings:', settings);
     // Implementation for saving delivery settings
+  };
+
+  const handleEditProduct = (index: number, product: Product) => {
+    setSelectedProduct({ index, product });
+    setIsEditProductModalOpen(true);
+  };
+
+  const showToast = (message: string) => {
+    setSuccessMessage(message);
+    setIsToastVisible(true);
+  };
+
+  const handleSaveEditedProduct = (editedProduct: { name: string; price: number; size?: string; photo?: File }) => {
+    if (!selectedStore || selectedProduct === null) return;
+
+    const updatedProduct = {
+      ...editedProduct,
+      photo: editedProduct.photo 
+        ? URL.createObjectURL(editedProduct.photo)
+        : selectedStore.products[selectedProduct.index].photo
+    };
+
+    const updatedStores = stores.map(store => {
+      if (store.id === selectedStore.id) {
+        const updatedProducts = [...store.products];
+        updatedProducts[selectedProduct.index] = updatedProduct;
+        return {
+          ...store,
+          products: updatedProducts
+        };
+      }
+      return store;
+    });
+
+    setStores(updatedStores);
+    setSelectedStore(prevStore => 
+      prevStore ? {
+        ...prevStore,
+        products: prevStore.products.map((p, i) => 
+          i === selectedProduct.index ? updatedProduct : p
+        )
+      } : null
+    );
+    setIsEditProductModalOpen(false);
+    showToast('Product updated successfully!');
+  };
+
+  const handleDeleteProduct = (index: number) => {
+    if (!selectedStore) return;
+
+    const updatedStores = stores.map(store => {
+      if (store.id === selectedStore.id) {
+        const updatedProducts = store.products.filter((_, i) => i !== index);
+        return {
+          ...store,
+          products: updatedProducts
+        };
+      }
+      return store;
+    });
+
+    setStores(updatedStores);
+    setSelectedStore(prevStore => 
+      prevStore ? {
+        ...prevStore,
+        products: prevStore.products.filter((_, i) => i !== index)
+      } : null
+    );
+    showToast('Product deleted successfully!');
   };
 
   return (
@@ -173,9 +332,33 @@ export default function Addresses() {
                 }`}
                 onClick={() => setSelectedStore(store)}
               >
-                <div className="flex items-center">
-                  <span className="text-sm text-gray-900">{store.name}</span>
-                  <span className="ml-2 text-xs text-gray-500">📍</span>
+                <div className="flex items-center space-x-3 min-w-0">
+                  {store.logo ? (
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
+                      <Image
+                        src={store.logo}
+                        alt={store.name}
+                        width={32}
+                        height={32}
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200">
+                      <span className="text-sm text-gray-500">
+                        {store.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-sm text-gray-900 truncate">{store.name}</span>
+                      <span className="text-xs text-gray-500">📍</span>
+                    </div>
+                    {store.category && (
+                      <span className="text-xs text-gray-500 truncate block">{store.category}</span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -198,7 +381,10 @@ export default function Addresses() {
                       />
                     </div>
                   )}
-                  <h2 className="text-xl font-medium text-gray-900">{selectedStore.name}</h2>
+                  <div>
+                    <h2 className="text-xl font-medium text-gray-900">{selectedStore.name}</h2>
+                    <p className="text-sm text-gray-500">{selectedStore.location}</p>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   {!selectedStore.isPhotoMenu && (
@@ -254,7 +440,7 @@ export default function Addresses() {
                         <div className="flex items-start space-x-4">
                           <div className="flex items-center space-x-3">
                             <div className="w-8 h-8 flex items-center justify-center bg-black text-white rounded-full text-sm font-medium">
-                              {photo.id}
+                              {photo.id.toString().padStart(2, '0')}
                             </div>
                             <div className="w-32 h-40 relative">
                               <Image
@@ -266,7 +452,10 @@ export default function Addresses() {
                               />
                             </div>
                           </div>
-                          <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                          <button 
+                            onClick={() => handleRemovePhoto(photo.id)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                          >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
                             </svg>
@@ -277,7 +466,6 @@ export default function Addresses() {
                   </div>
                 </div>
               ) : (
-                /* Products Table */
                 <div>
                   <div className="grid grid-cols-12 gap-4 py-2 border-b border-gray-200">
                     <div className="col-span-8 text-xs font-medium text-gray-500 uppercase tracking-wider">Product</div>
@@ -289,16 +477,58 @@ export default function Addresses() {
                       key={index}
                       className="grid grid-cols-12 gap-4 py-3 border-b border-gray-100 items-center hover:bg-gray-50"
                     >
-                      <div className="col-span-8 text-sm text-gray-900">
-                        {product.name} {product.size && `- ${product.size}`}
+                      <div className="col-span-8 flex items-center space-x-3">
+                        {product.photo && (
+                          <div className="w-12 h-12 relative rounded-lg overflow-hidden flex-shrink-0">
+                            <Image
+                              src={product.photo}
+                              alt={product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        )}
+                        <span className="text-sm text-gray-900">
+                          {product.name} {product.size && `- ${product.size}`}
+                        </span>
                       </div>
                       <div className="col-span-3 text-sm text-gray-900">₱{product.price.toFixed(2)}</div>
                       <div className="col-span-1 text-right">
-                        <button className="text-gray-400 hover:text-gray-600">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-                          </svg>
-                        </button>
+                        <div className="relative">
+                          <button 
+                            onClick={() => setOpenMenuIndex(openMenuIndex === index ? null : index)}
+                            className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
+                          >
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                            </svg>
+                          </button>
+                          {openMenuIndex === index && (
+                            <div 
+                              id={`product-menu-${index}`}
+                              className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200"
+                            >
+                              <button
+                                onClick={() => {
+                                  handleEditProduct(index, product);
+                                  setOpenMenuIndex(null);
+                                }}
+                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                              >
+                                Edit Product
+                              </button>
+                              <button
+                                onClick={() => {
+                                  handleDeleteProduct(index);
+                                  setOpenMenuIndex(null);
+                                }}
+                                className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"
+                              >
+                                Delete Product
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -386,6 +616,30 @@ export default function Addresses() {
             />
           </>
         )}
+
+        {/* Edit Product Modal */}
+        {isEditProductModalOpen && selectedProduct && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/5 z-40"
+              onClick={() => setIsEditProductModalOpen(false)}
+            />
+            <EditProductModal
+              isOpen={isEditProductModalOpen}
+              onClose={() => setIsEditProductModalOpen(false)}
+              onSave={handleSaveEditedProduct}
+              product={selectedProduct.product}
+            />
+          </>
+        )}
+
+        {/* Toast */}
+        <Toast
+          message={successMessage}
+          isVisible={isToastVisible}
+          onClose={() => setIsToastVisible(false)}
+          type="success"
+        />
       </div>
     </>
   );
