@@ -25,7 +25,7 @@ export const AddProductModal = ({ isOpen, onClose, onSave, storeId }: AddProduct
       }
 
       // Make API call to create menu item
-      const apiUrl = process.env.API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
       console.log('Making API call to:', `${apiUrl}/api/menu-items`, {
         name: productName,
         price: parseFloat(productPrice),

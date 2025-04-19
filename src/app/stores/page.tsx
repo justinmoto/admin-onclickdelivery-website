@@ -12,6 +12,7 @@ import { Toast } from '../components/Toast';
 import { ImageModal } from '../components/ImageModal';
 import { EditStoreModal } from '../components/EditStoreModal';
 import { DeleteStoreModal } from '../components/DeleteStoreModal';
+import { toast } from 'react-hot-toast';
 
 interface Store {
   id: number;
@@ -67,6 +68,9 @@ export default function Addresses() {
   const [storeToEdit, setStoreToEdit] = useState<Store | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
+  const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false);
+
+  const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -79,7 +83,7 @@ export default function Addresses() {
 
       try {
         setError(null); // Clear any previous errors
-        const apiUrl = process.env.API_URL || 'http://localhost:3001';
+        const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
         const response = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
           method: 'GET',
           headers: {
@@ -163,7 +167,7 @@ export default function Addresses() {
       if (!selectedStore?.id) return;
 
       try {
-        const apiUrl = process.env.API_URL || 'http://localhost:3001';
+        const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
         const response = await fetch(`${apiUrl}/api/menu-photos?store_id=${selectedStore.id}`, {
           method: 'GET',
           headers: {
@@ -235,7 +239,7 @@ export default function Addresses() {
       try {
         setIsLoading(true);
         setError(null);
-        const apiUrl = process.env.API_URL || 'http://localhost:3001';
+        const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
         
         // Log the API URL for debugging
         console.log('API URL from env:', apiUrl);
@@ -354,7 +358,7 @@ export default function Addresses() {
 
     // Refetch menu items to get the updated list from the server
     try {
-      const apiUrl = process.env.API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
       const response = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
         method: 'GET',
         headers: {
@@ -435,8 +439,8 @@ export default function Addresses() {
 
     try {
       setIsDeletingPhoto(photoId); // Set loading state
-      const apiUrl = process.env.API_URL || 'http://localhost:3001';
-      const nextApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+      const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
+      const nextApiUrl = process.env.CLOUDINARY_API_URL || 'http://localhost:3002';
       console.log('Deleting photo with ID:', photoId);
 
       // Get photo URL from local state
@@ -616,7 +620,7 @@ export default function Addresses() {
         const matches = storeToDelete.logo_url.match(/\/upload\/v\d+\/(.+)$/);
         if (matches && matches[1]) {
           const publicId = matches[1].replace(/\.[^/.]+$/, "");
-          const cloudinaryApiUrl = process.env.NEXT_PUBLIC_API_URL;
+          const cloudinaryApiUrl = process.env.CLOUDINARY_API_URL;
           
           try {
             const deleteResponse = await fetch(`${cloudinaryApiUrl}/api/delete`, {
@@ -637,7 +641,7 @@ export default function Addresses() {
       }
       
       // Then delete the store from the database
-      const apiUrl = process.env.API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
       const response = await fetch(`${apiUrl}/api/stores/${storeToDelete.id}`, {
         method: 'DELETE',
         headers: {
@@ -687,6 +691,109 @@ export default function Addresses() {
     } catch (err) {
       console.error('Error updating store:', err);
       showToast(err instanceof Error ? err.message : 'Failed to update store');
+    }
+  };
+
+  const handleImportProducts = async (products: Array<{ name: string; price: number }>) => {
+    try {
+      if (!selectedStore) {
+        toast.error('Please select a store first');
+        return;
+      }
+
+      const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
+      const importedProducts: Array<Product> = [];
+
+      // Add products one at a time
+      for (const product of products) {
+        try {
+          // Ensure price is a valid number
+          const price = Number(product.price);
+          if (isNaN(price)) {
+            toast.error(`Invalid price for product: ${product.name}`);
+            continue;
+          }
+
+          const response = await fetch(`${apiUrl}/api/menu-items`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: product.name,
+              price: price,
+              store_id: selectedStore.id
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.text();
+            console.error('Error response:', errorData);
+            throw new Error(`Failed to import product: ${product.name}`);
+          }
+
+          const result = await response.json();
+          if (result.menuItem) {
+            // Ensure the imported product has a valid price
+            const importedProduct: Product = {
+              id: result.menuItem.id,
+              name: result.menuItem.name,
+              price: Number(result.menuItem.price) || 0
+            };
+            importedProducts.push(importedProduct);
+          }
+        } catch (productError) {
+          console.error('Error importing product:', productError);
+          toast.error(`Failed to import: ${product.name}`);
+          // Continue with next product
+          continue;
+        }
+      }
+
+      if (importedProducts.length > 0) {
+        // Fetch the updated menu items from the server
+        const menuItemsResponse = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+        });
+
+        if (!menuItemsResponse.ok) {
+          throw new Error('Failed to fetch updated menu items');
+        }
+
+        const menuItemsData = await menuItemsResponse.json();
+        const updatedMenuItems = menuItemsData.menuItems || [];
+
+        // Update the UI with the fresh data from the server
+        setStores(prevStores =>
+          prevStores.map(store =>
+            store.id === selectedStore.id
+              ? {
+                  ...store,
+                  products: updatedMenuItems
+                }
+              : store
+          )
+        );
+
+        setSelectedStore(prevStore => 
+          prevStore ? {
+            ...prevStore,
+            products: updatedMenuItems
+          } : null
+        );
+
+        toast.success(`Successfully imported ${importedProducts.length} products`);
+      } else {
+        toast.error('No products were imported successfully');
+      }
+      
+      setIsImportExcelModalOpen(false);
+    } catch (error) {
+      console.error('Error importing products:', error);
+      toast.error('Failed to import products. Please try again.');
     }
   };
 
@@ -850,18 +957,32 @@ export default function Addresses() {
                 </div>
                 <div className="flex items-center space-x-3">
                   {!selectedStore.isPhotoMenu && (
-                    <button
-                      onClick={() => {
-                        if (selectedStore?.id) {
-                          setIsAddProductModalOpen(true);
-                        } else {
-                          showToast('Please select a store first');
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-black text-white rounded text-sm font-medium hover:bg-gray-800"
-                    >
-                      + Add Product
-                    </button>
+                    <>
+                      <button
+                        onClick={() => {
+                          if (selectedStore?.id) {
+                            setIsAddProductModalOpen(true);
+                          } else {
+                            showToast('Please select a store first');
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-black text-white rounded text-sm font-medium hover:bg-gray-800"
+                      >
+                        + Add Product
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!selectedStore) {
+                            toast.error('Please select a store first');
+                            return;
+                          }
+                          setIsImportExcelModalOpen(true);
+                        }}
+                        className="ml-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none"
+                      >
+                        Import Excel
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -952,9 +1073,9 @@ export default function Addresses() {
                       <p className="text-gray-500 text-sm">No products available</p>
                     </div>
                   ) : (
-                    selectedStore.products.map((product) => (
+                    selectedStore.products.map((product, index) => (
                       <div
-                        key={product.id}
+                        key={`product-${product.id}-${index}`}
                         className="grid grid-cols-12 gap-4 py-3 border-b border-gray-100 items-center hover:bg-gray-50"
                       >
                         <div className="col-span-8 flex items-center">
@@ -962,7 +1083,9 @@ export default function Addresses() {
                             {product.name}
                           </span>
                         </div>
-                        <div className="col-span-3 text-sm text-gray-900">₱{product.price.toFixed(2)}</div>
+                        <div className="col-span-3 text-sm text-gray-900">
+                          ₱{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
+                        </div>
                         <div className="col-span-1 text-right">
                           <div className="relative">
                             <button 
@@ -975,12 +1098,13 @@ export default function Addresses() {
                             </button>
                             {openMenuIndex === product.id && (
                               <div 
+                                key={`menu-${product.id}`}
                                 id={`product-menu-${product.id}`}
                                 className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200"
                               >
                                 <button
                                   onClick={() => {
-                                    handleEditProduct(selectedStore.products.findIndex(p => p.id === product.id), product);
+                                    handleEditProduct(index, product);
                                     setOpenMenuIndex(null);
                                   }}
                                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
@@ -989,7 +1113,7 @@ export default function Addresses() {
                                 </button>
                                 <button
                                   onClick={() => {
-                                    handleDeleteProduct(selectedStore.products.findIndex(p => p.id === product.id));
+                                    handleDeleteProduct(index);
                                     setOpenMenuIndex(null);
                                   }}
                                   className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"
@@ -1134,6 +1258,22 @@ export default function Addresses() {
           storeName={storeToDelete?.name || ''}
           isLoading={isDeletingStore === storeToDelete?.id}
         />
+
+        {/* Import Excel Modal */}
+        {isImportExcelModalOpen && selectedStore?.id && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/5 z-40"
+              onClick={() => setIsImportExcelModalOpen(false)}
+            />
+            <ImportExcelModal
+              isOpen={isImportExcelModalOpen}
+              onClose={() => setIsImportExcelModalOpen(false)}
+              onImport={handleImportProducts}
+              storeId={selectedStore.id}
+            />
+          </>
+        )}
       </div>
     </>
   );

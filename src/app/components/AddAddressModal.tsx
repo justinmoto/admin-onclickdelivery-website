@@ -231,7 +231,7 @@ export const AddAddressModal = ({
       }
 
       // Make API call to create store
-      const apiUrl = process.env.API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
       console.log('Making API call to:', `${apiUrl}/api/stores`);
       
       const response = await fetch(`${apiUrl}/api/stores`, {
