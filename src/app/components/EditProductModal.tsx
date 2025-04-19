@@ -79,6 +79,7 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
                         alt="Product preview"
                         fill
                         className="object-cover"
+                        unoptimized
                       />
                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
                         <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">

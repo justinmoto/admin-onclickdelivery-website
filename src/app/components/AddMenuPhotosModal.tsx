@@ -98,6 +98,7 @@ export const AddMenuPhotosModal = ({ isOpen, onClose, onSave }: AddMenuPhotosMod
                               alt={`Menu photo ${index + 1}`}
                               fill
                               className="object-cover"
+                              unoptimized
                             />
                           )}
                         </div>

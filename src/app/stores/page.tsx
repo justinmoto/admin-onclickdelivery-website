@@ -9,6 +9,7 @@ import { AddMenuPhotosModal } from '../components/AddMenuPhotosModal';
 import { DeliverySettingsModal } from '../components/DeliverySettingsModal';
 import { EditProductModal } from '../components/EditProductModal';
 import { Toast } from '../components/Toast';
+import { ImageModal } from '../components/ImageModal';
 
 interface Store {
   id: number;
@@ -33,6 +34,7 @@ interface Product {
   price: number;
   size?: string;
   photo?: string;
+  image_url?: string;
 }
 
 interface MenuPhoto {
@@ -46,7 +48,6 @@ export default function Addresses() {
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [isAddAddressModalOpen, setIsAddAddressModalOpen] = useState(false);
-  const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false);
   const [isAddMenuPhotosModalOpen, setIsAddMenuPhotosModalOpen] = useState(false);
   const [isDeliverySettingsModalOpen, setIsDeliverySettingsModalOpen] = useState(false);
   const [stores, setStores] = useState<Store[]>([]);
@@ -58,10 +59,101 @@ export default function Addresses() {
   const [nextId, setNextId] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Fetch menu items when a store is selected
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      if (!selectedStore?.id) return;
+
+      try {
+        setError(null); // Clear any previous errors
+        const apiUrl = process.env.API_URL || 'http://localhost:3001';
+        const response = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            // If no products found, set empty array instead of showing error
+            setSelectedStore(prevStore => {
+              if (!prevStore) return null;
+              return {
+                ...prevStore,
+                products: []
+              };
+            });
+            setStores(prevStores => 
+              prevStores.map(store => 
+                store.id === selectedStore.id 
+                  ? { ...store, products: [] }
+                  : store
+              )
+            );
+            return;
+          }
+          throw new Error(`Failed to fetch menu items: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Raw API Response:', data);
+        console.log('Menu Items Structure:', data.menuItems ? data.menuItems[0] : 'No items');
+
+        // If menuItems is null/undefined or empty array, set empty array
+        const menuItems = data.menuItems || [];
+        
+        // Debug log to check product data
+        console.log('Menu items with photos:', menuItems.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          photo: item.image_url,
+          photoUrl: item.image_url ? `Complete photo URL: ${item.image_url}` : 'No photo'
+        })));
+
+        // Ensure all required fields are present and photo URLs are properly formatted
+        const validatedMenuItems = menuItems.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          size: item.size || undefined,
+          photo: item.image_url,
+          image_url: item.image_url
+        }));
+
+        console.log('Validated menu items:', validatedMenuItems);
+
+        // Update the selected store's products
+        setSelectedStore(prevStore => {
+          if (!prevStore) return null;
+          return {
+            ...prevStore,
+            products: validatedMenuItems
+          };
+        });
+
+        // Update the store in the stores array
+        setStores(prevStores => 
+          prevStores.map(store => 
+            store.id === selectedStore.id 
+              ? { ...store, products: validatedMenuItems }
+              : store
+          )
+        );
+      } catch (err) {
+        console.error('Error fetching menu items:', err);
+        setError('No products available');
+      }
+    };
+
+    fetchMenuItems();
+  }, [selectedStore?.id]); // Re-fetch when selected store changes
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -137,11 +229,6 @@ export default function Addresses() {
     };
   }, [openMenuIndex]);
 
-  const handleImportExcel = (file: File) => {
-    console.log('Importing Excel file:', file);
-    // Implementation for importing Excel file
-  };
-
   const handleTogglePhotoMenu = (store: Store) => {
     const updatedStores = stores.map(s => {
       if (s.id === store.id) {
@@ -155,16 +242,22 @@ export default function Addresses() {
     );
   };
 
-  const handleAddProduct = (product: { name: string; price: number; photo?: File }) => {
+  const handleAddProduct = async (product: { name: string; price: number; photo?: File }) => {
     if (!selectedStore) return;
 
+    // Get the highest existing product ID
+    const highestId = selectedStore.products.reduce((max, product) => 
+      Math.max(max, product.id), 0);
+
     const newProduct: Product = {
-      id: Date.now(),
+      id: highestId + 1,
       name: product.name,
       price: product.price,
       photo: product.photo ? URL.createObjectURL(product.photo) : undefined,
+      image_url: product.photo ? URL.createObjectURL(product.photo) : undefined
     };
 
+    // Optimistically update the UI
     setStores(prevStores =>
       prevStores.map(store =>
         store.id === selectedStore.id
@@ -185,6 +278,52 @@ export default function Addresses() {
 
     setIsAddProductModalOpen(false);
     showToast('Product added successfully!');
+
+    // Refetch menu items to get the updated list from the server
+    try {
+      const apiUrl = process.env.API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch updated menu items: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Update with the fresh data from the server
+      const validatedMenuItems = (data.menuItems || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        size: item.size || undefined,
+        photo: item.image_url,
+        image_url: item.image_url
+      }));
+
+      setStores(prevStores => 
+        prevStores.map(store => 
+          store.id === selectedStore.id 
+            ? { ...store, products: validatedMenuItems }
+            : store
+        )
+      );
+
+      setSelectedStore(prevStore => {
+        if (!prevStore) return null;
+        return {
+          ...prevStore,
+          products: validatedMenuItems
+        };
+      });
+    } catch (err) {
+      console.error('Error fetching updated menu items:', err);
+      // Don't show error to user since this is just a refresh operation
+    }
   };
 
   const handleAddMenuPhotos = (photos: File[]) => {
@@ -355,12 +494,6 @@ export default function Addresses() {
                 Options
               </button>
               <button 
-                onClick={() => setIsImportExcelModalOpen(true)}
-                className="px-4 py-2 bg-gray-100 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 mr-3"
-              >
-                Import Excel
-              </button>
-              <button 
                 onClick={() => setIsAddAddressModalOpen(true)}
                 className="px-4 py-2 bg-black text-white rounded text-sm font-medium hover:bg-gray-800"
               >
@@ -444,6 +577,7 @@ export default function Addresses() {
                         alt={selectedStore.name}
                         width={48}
                         height={48}
+                        unoptimized
                       />
                     </div>
                   )}
@@ -455,7 +589,13 @@ export default function Addresses() {
                 <div className="flex items-center space-x-3">
                   {!selectedStore.isPhotoMenu && (
                     <button
-                      onClick={() => setIsAddProductModalOpen(true)}
+                      onClick={() => {
+                        if (selectedStore?.id) {
+                          setIsAddProductModalOpen(true);
+                        } else {
+                          showToast('Please select a store first');
+                        }
+                      }}
                       className="px-3 py-1.5 bg-black text-white rounded text-sm font-medium hover:bg-gray-800"
                     >
                       + Add Product
@@ -515,6 +655,7 @@ export default function Addresses() {
                                 layout="fill"
                                 objectFit="cover"
                                 className="rounded border border-gray-200"
+                                unoptimized
                               />
                             </div>
                           </div>
@@ -538,66 +679,78 @@ export default function Addresses() {
                     <div className="col-span-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Price</div>
                     <div className="col-span-1"></div>
                   </div>
-                  {selectedStore.products.map((product) => (
-                    <div
-                      key={product.id}
-                      className="grid grid-cols-12 gap-4 py-3 border-b border-gray-100 items-center hover:bg-gray-50"
-                    >
-                      <div className="col-span-8 flex items-center space-x-3">
-                        {product.photo && (
-                          <div className="w-12 h-12 relative rounded-lg overflow-hidden flex-shrink-0">
-                            <Image
-                              src={product.photo}
-                              alt={product.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                        )}
-                        <span className="text-sm text-gray-900">
-                          {product.name} {product.size && `- ${product.size}`}
-                        </span>
-                      </div>
-                      <div className="col-span-3 text-sm text-gray-900">₱{product.price.toFixed(2)}</div>
-                      <div className="col-span-1 text-right">
-                        <div className="relative">
-                          <button 
-                            onClick={() => setOpenMenuIndex(openMenuIndex === product.id ? null : product.id)}
-                            className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
-                          >
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-                            </svg>
-                          </button>
-                          {openMenuIndex === product.id && (
+                  {selectedStore.products.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-gray-500 text-sm">No products available</p>
+                    </div>
+                  ) : (
+                    selectedStore.products.map((product) => (
+                      <div
+                        key={product.id}
+                        className="grid grid-cols-12 gap-4 py-3 border-b border-gray-100 items-center hover:bg-gray-50"
+                      >
+                        <div className="col-span-8 flex items-center space-x-3">
+                          {product.photo && (
                             <div 
-                              id={`product-menu-${product.id}`}
-                              className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200"
+                              className="w-16 h-16 relative rounded-lg overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => setSelectedImage({ url: product.photo!, alt: product.name })}
                             >
-                              <button
-                                onClick={() => {
-                                  handleEditProduct(selectedStore.products.findIndex(p => p.id === product.id), product);
-                                  setOpenMenuIndex(null);
-                                }}
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                              >
-                                Edit Product
-                              </button>
-                              <button
-                                onClick={() => {
-                                  handleDeleteProduct(selectedStore.products.findIndex(p => p.id === product.id));
-                                  setOpenMenuIndex(null);
-                                }}
-                                className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"
-                              >
-                                Delete Product
-                              </button>
+                              <Image
+                                src={product.photo}
+                                alt={product.name}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                                sizes="(max-width: 768px) 64px, 64px"
+                                priority
+                              />
                             </div>
                           )}
+                          <span className="text-sm text-gray-900">
+                            {product.name} {product.size && `- ${product.size}`}
+                          </span>
+                        </div>
+                        <div className="col-span-3 text-sm text-gray-900">₱{product.price.toFixed(2)}</div>
+                        <div className="col-span-1 text-right">
+                          <div className="relative">
+                            <button 
+                              onClick={() => setOpenMenuIndex(openMenuIndex === product.id ? null : product.id)}
+                              className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
+                            >
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                              </svg>
+                            </button>
+                            {openMenuIndex === product.id && (
+                              <div 
+                                id={`product-menu-${product.id}`}
+                                className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200"
+                              >
+                                <button
+                                  onClick={() => {
+                                    handleEditProduct(selectedStore.products.findIndex(p => p.id === product.id), product);
+                                    setOpenMenuIndex(null);
+                                  }}
+                                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                                >
+                                  Edit Product
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    handleDeleteProduct(selectedStore.products.findIndex(p => p.id === product.id));
+                                    setOpenMenuIndex(null);
+                                  }}
+                                  className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"
+                                >
+                                  Delete Product
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -609,7 +762,7 @@ export default function Addresses() {
         </div>
 
         {/* Add Product Panel */}
-        {isAddProductModalOpen && (
+        {isAddProductModalOpen && selectedStore?.id && (
           <>
             <div 
               className="fixed inset-0 bg-black/5 z-40"
@@ -619,6 +772,7 @@ export default function Addresses() {
               isOpen={isAddProductModalOpen}
               onClose={() => setIsAddProductModalOpen(false)}
               onSave={handleAddProduct}
+              storeId={selectedStore.id}
             />
           </>
         )}
@@ -634,21 +788,6 @@ export default function Addresses() {
               isOpen={isAddAddressModalOpen}
               onClose={() => setIsAddAddressModalOpen(false)}
               onSave={handleAddAddress}
-            />
-          </>
-        )}
-
-        {/* Import Excel Panel */}
-        {isImportExcelModalOpen && (
-          <>
-            <div 
-              className="fixed inset-0 bg-black/5 z-40"
-              onClick={() => setIsImportExcelModalOpen(false)}
-            />
-            <ImportExcelModal
-              isOpen={isImportExcelModalOpen}
-              onClose={() => setIsImportExcelModalOpen(false)}
-              onImport={handleImportExcel}
             />
           </>
         )}
@@ -697,6 +836,16 @@ export default function Addresses() {
               product={selectedProduct.product}
             />
           </>
+        )}
+
+        {/* Image Modal */}
+        {selectedImage && (
+          <ImageModal
+            isOpen={!!selectedImage}
+            onClose={() => setSelectedImage(null)}
+            imageUrl={selectedImage.url}
+            altText={selectedImage.alt}
+          />
         )}
 
         {/* Toast */}
