@@ -10,6 +10,8 @@ import { DeliverySettingsModal } from '../components/DeliverySettingsModal';
 import { EditProductModal } from '../components/EditProductModal';
 import { Toast } from '../components/Toast';
 import { ImageModal } from '../components/ImageModal';
+import { EditStoreModal } from '../components/EditStoreModal';
+import { DeleteStoreModal } from '../components/DeleteStoreModal';
 
 interface Store {
   id: number;
@@ -19,7 +21,9 @@ interface Store {
   isPhotoMenu: boolean;
   products: Product[];
   menuPhotos?: MenuPhoto[];
-  category?: string;
+  category: string;
+  longitude: number;
+  latitude: number;
 }
 
 interface DeliveryFare {
@@ -57,6 +61,12 @@ export default function Addresses() {
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState<number | null>(null);
+  const [openStoreMenuId, setOpenStoreMenuId] = useState<number | null>(null);
+  const [isDeletingStore, setIsDeletingStore] = useState<number | null>(null);
+  const [isEditStoreModalOpen, setIsEditStoreModalOpen] = useState(false);
+  const [storeToEdit, setStoreToEdit] = useState<Store | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -506,14 +516,16 @@ export default function Addresses() {
     const highestId = stores.reduce((max, store) => Math.max(max, store.id), 0);
     
     const newStore: Store = {
-      id: highestId + 1, // Use highest existing ID + 1
+      id: highestId + 1,
       name: address.tradeName,
       location: address.address,
       category: address.category,
       logo_url: address.logo ? URL.createObjectURL(address.logo) : undefined,
       isPhotoMenu: false,
       products: [],
-      menuPhotos: []
+      menuPhotos: [],
+      longitude: address.coordinates?.lng || 0,
+      latitude: address.coordinates?.lat || 0
     };
 
     setStores(prevStores => [...prevStores, newStore]);
@@ -587,6 +599,97 @@ export default function Addresses() {
     showToast('Product deleted successfully!');
   };
 
+  const handleDeleteClick = (store: Store) => {
+    setStoreToDelete(store);
+    setIsDeleteModalOpen(true);
+    setOpenStoreMenuId(null);
+  };
+
+  const handleDeleteStore = async () => {
+    if (!storeToDelete) return;
+
+    try {
+      setIsDeletingStore(storeToDelete.id);
+
+      // First, delete the logo from Cloudinary if it exists
+      if (storeToDelete.logo_url) {
+        const matches = storeToDelete.logo_url.match(/\/upload\/v\d+\/(.+)$/);
+        if (matches && matches[1]) {
+          const publicId = matches[1].replace(/\.[^/.]+$/, "");
+          const cloudinaryApiUrl = process.env.NEXT_PUBLIC_API_URL;
+          
+          try {
+            const deleteResponse = await fetch(`${cloudinaryApiUrl}/api/delete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ publicId }),
+            });
+
+            if (!deleteResponse.ok) {
+              console.error('Failed to delete store logo from Cloudinary:', await deleteResponse.text());
+            }
+          } catch (deleteError) {
+            console.error('Error deleting store logo from Cloudinary:', deleteError);
+          }
+        }
+      }
+      
+      // Then delete the store from the database
+      const apiUrl = process.env.API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/stores/${storeToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete store: ${response.status}`);
+      }
+
+      // Remove store from state
+      setStores(prevStores => prevStores.filter(store => store.id !== storeToDelete.id));
+      if (selectedStore?.id === storeToDelete.id) {
+        setSelectedStore(null);
+      }
+      showToast('Store deleted successfully!');
+    } catch (err) {
+      console.error('Error deleting store:', err);
+      showToast(err instanceof Error ? err.message : 'Failed to delete store');
+    } finally {
+      setIsDeletingStore(null);
+      setIsDeleteModalOpen(false);
+      setStoreToDelete(null);
+    }
+  };
+
+  const handleEditStore = (store: Store) => {
+    setStoreToEdit(store);
+    setIsEditStoreModalOpen(true);
+    setOpenStoreMenuId(null);
+  };
+
+  const handleSaveEditedStore = async (updatedStore: Store) => {
+    try {
+      // Only update the UI after successful API response from EditStoreModal
+      setStores(prevStores =>
+        prevStores.map(store =>
+          store.id === updatedStore.id ? updatedStore : store
+        )
+      );
+      if (selectedStore?.id === updatedStore.id) {
+        setSelectedStore(updatedStore);
+      }
+      setIsEditStoreModalOpen(false);
+      showToast('Store updated successfully!');
+    } catch (err) {
+      console.error('Error updating store:', err);
+      showToast(err instanceof Error ? err.message : 'Failed to update store');
+    }
+  };
+
   return (
     <>
       <Head>
@@ -650,7 +753,7 @@ export default function Addresses() {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-3 min-w-0">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
                     {store.logo_url ? (
                       <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
                         <Image
@@ -678,6 +781,44 @@ export default function Addresses() {
                         <span className="text-xs text-gray-500 truncate block">{store.category}</span>
                       )}
                     </div>
+                  </div>
+                  <div className="relative flex-shrink-0 ml-4">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenStoreMenuId(openStoreMenuId === store.id ? null : store.id);
+                      }}
+                      className="p-1 hover:bg-gray-100 rounded-full"
+                      disabled={isDeletingStore === store.id}
+                    >
+                      <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                      </svg>
+                    </button>
+                    {openStoreMenuId === store.id && (
+                      <div 
+                        className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditStore(store);
+                          }}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        >
+                          Edit Store
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(store);
+                          }}
+                          className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"
+                        >
+                          Delete Store
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -950,6 +1091,22 @@ export default function Addresses() {
           </>
         )}
 
+        {/* Edit Store Modal */}
+        {isEditStoreModalOpen && storeToEdit && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/5 z-40"
+              onClick={() => setIsEditStoreModalOpen(false)}
+            />
+            <EditStoreModal
+              isOpen={isEditStoreModalOpen}
+              onClose={() => setIsEditStoreModalOpen(false)}
+              onSave={handleSaveEditedStore}
+              store={storeToEdit}
+            />
+          </>
+        )}
+
         {/* Toast */}
         <Toast
           message={successMessage}
@@ -964,6 +1121,18 @@ export default function Addresses() {
           onClose={() => setSelectedImage(null)}
           imageUrl={selectedImage?.url || ''}
           altText={selectedImage?.alt || ''}
+        />
+
+        {/* Delete Store Modal */}
+        <DeleteStoreModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setStoreToDelete(null);
+          }}
+          onConfirm={handleDeleteStore}
+          storeName={storeToDelete?.name || ''}
+          isLoading={isDeletingStore === storeToDelete?.id}
         />
       </div>
     </>

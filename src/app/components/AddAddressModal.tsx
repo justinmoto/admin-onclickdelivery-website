@@ -23,6 +23,8 @@ interface FormState {
   address?: string;
   coordinates?: { lat: number; lng: number };
   logo: File | null;
+  longitude?: number;
+  latitude?: number;
 }
 
 interface AddAddressModalProps {
@@ -97,6 +99,8 @@ export const AddAddressModal = ({
         ...prev,
         address,
         coordinates: { lat, lng },
+        longitude: lng,
+        latitude: lat
       }));
     } catch (error) {
       console.error("Error:", error);
@@ -120,6 +124,8 @@ export const AddAddressModal = ({
             ...prev,
             address,
             coordinates: { lat, lng },
+            longitude: lng,
+            latitude: lat
           }));
           setValue(address, false);
         }
@@ -151,6 +157,8 @@ export const AddAddressModal = ({
               ...prev,
               address,
               coordinates: { lat, lng },
+              longitude: lng,
+              latitude: lat
             }));
             setValue(address, false);
           }
@@ -237,6 +245,8 @@ export const AddAddressModal = ({
           category: form.category,
           logo_url: logo_url,
           location: form.address,
+          longitude: form.longitude,
+          latitude: form.latitude
         }),
       });
 
@@ -489,6 +499,34 @@ export const AddAddressModal = ({
                   <p className="text-sm text-gray-700">
                     Selected Address: {form.address}
                   </p>
+                </div>
+              )}
+
+              {/* Coordinates Display */}
+              {form.coordinates && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Longitude
+                    </label>
+                    <input
+                      type="text"
+                      value={form.longitude?.toFixed(6) || ''}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Latitude
+                    </label>
+                    <input
+                      type="text"
+                      value={form.latitude?.toFixed(6) || ''}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700"
+                    />
+                  </div>
                 </div>
               )}
             </div>
