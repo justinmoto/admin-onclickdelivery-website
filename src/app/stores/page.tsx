@@ -56,7 +56,6 @@ export default function Addresses() {
   const [successMessage, setSuccessMessage] = useState('');
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
-  const [nextId, setNextId] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
@@ -389,8 +388,11 @@ export default function Addresses() {
     coordinates?: { lat: number; lng: number };
     logo?: File;
   }) => {
+    // Find the highest existing ID in the stores array
+    const highestId = stores.reduce((max, store) => Math.max(max, store.id), 0);
+    
     const newStore: Store = {
-      id: nextId,
+      id: highestId + 1, // Use highest existing ID + 1
       name: address.tradeName,
       location: address.address,
       category: address.category,
@@ -401,7 +403,6 @@ export default function Addresses() {
     };
 
     setStores(prevStores => [...prevStores, newStore]);
-    setNextId(prevId => prevId + 1);
     setIsAddAddressModalOpen(false);
     showToast('Store added successfully!');
   };
@@ -421,14 +422,13 @@ export default function Addresses() {
     setIsToastVisible(true);
   };
 
-  const handleSaveEditedProduct = (editedProduct: { name: string; price: number; size?: string; photo?: File }) => {
+  const handleSaveEditedProduct = (editedProduct: { name: string; price: number; photo?: File }) => {
     if (!selectedStore || !selectedProduct) return;
 
     const updatedProduct: Product = {
       id: selectedProduct.product.id,
       name: editedProduct.name,
       price: editedProduct.price,
-      size: editedProduct.size,
       photo: editedProduct.photo ? URL.createObjectURL(editedProduct.photo) : selectedProduct.product.photo,
     };
 
@@ -524,10 +524,18 @@ export default function Addresses() {
               filteredStores.map((store) => (
                 <div
                   key={store.id}
-                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between ${
-                    selectedStore?.id === store.id ? 'bg-gray-100' : ''
+                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between border-l-4 ${
+                    selectedStore?.id === store.id 
+                      ? 'bg-gray-100 border-black' 
+                      : 'border-transparent hover:border-gray-200'
                   }`}
-                  onClick={() => setSelectedStore(store)}
+                  onClick={() => {
+                    if (selectedStore?.id === store.id) {
+                      setSelectedStore(null);
+                    } else {
+                      setSelectedStore(store);
+                    }
+                  }}
                 >
                   <div className="flex items-center space-x-3 min-w-0">
                     {store.logo_url ? (

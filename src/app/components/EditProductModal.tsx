@@ -6,27 +6,27 @@ import Image from 'next/image';
 interface EditProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (product: { name: string; price: number; size?: string; photo?: File }) => void;
+  onSave: (product: { name: string; price: number; photo?: File }) => void;
   product: {
     name: string;
     price: number;
-    size?: string;
     photo?: string;
+    image_url?: string;
   };
 }
 
 export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProductModalProps) => {
   const [productName, setProductName] = useState(product.name);
   const [productPrice, setProductPrice] = useState(product.price.toString());
-  const [productSize, setProductSize] = useState(product.size || '');
   const [productPhoto, setProductPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string>(product.photo || '');
+  const [photoPreview, setPhotoPreview] = useState<string>(product.image_url || product.photo || '');
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setProductPhoto(file);
-      setPhotoPreview(URL.createObjectURL(file));
+      const previewUrl = URL.createObjectURL(file);
+      setPhotoPreview(previewUrl);
     }
   };
 
@@ -35,7 +35,6 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
     onSave({
       name: productName,
       price: parseFloat(productPrice) || 0,
-      size: productSize || undefined,
       photo: productPhoto || undefined
     });
     onClose();
@@ -80,6 +79,8 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
                         fill
                         className="object-cover"
                         unoptimized
+                        sizes="(max-width: 768px) 100vw, 400px"
+                        priority
                       />
                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
                         <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,19 +118,6 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
                 placeholder="Enter product name"
                 required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Product Size (Optional)
-              </label>
-              <input
-                type="text"
-                value={productSize}
-                onChange={(e) => setProductSize(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
-                placeholder='e.g., Small, Medium, Large, 9", 11"'
               />
             </div>
 
