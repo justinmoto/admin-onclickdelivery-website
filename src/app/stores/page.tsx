@@ -32,9 +32,6 @@ interface Product {
   id: number;
   name: string;
   price: number;
-  size?: string;
-  photo?: string;
-  image_url?: string;
 }
 
 interface MenuPhoto {
@@ -59,6 +56,7 @@ export default function Addresses() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState<number | null>(null);
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -151,7 +149,75 @@ export default function Addresses() {
       }
     };
 
+    const fetchMenuPhotos = async () => {
+      if (!selectedStore?.id) return;
+
+      try {
+        const apiUrl = process.env.API_URL || 'http://localhost:3001';
+        const response = await fetch(`${apiUrl}/api/menu-photos?store_id=${selectedStore.id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            // If no photos found, set empty array
+            setSelectedStore(prevStore => {
+              if (!prevStore) return null;
+              return {
+                ...prevStore,
+                menuPhotos: []
+              };
+            });
+            return;
+          }
+          throw new Error(`Failed to fetch menu photos: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Menu Photos Response:', data);
+
+        // Ensure menuPhotos is an array
+        const menuPhotos = data.menuPhotos || [];
+
+        // Update the selected store's menu photos
+        setSelectedStore(prevStore => {
+          if (!prevStore) return null;
+          return {
+            ...prevStore,
+            menuPhotos: menuPhotos.map((photo: any) => ({
+              id: photo.id,
+              url: photo.photo_url,
+              thumbnail: photo.photo_url
+            }))
+          };
+        });
+
+        // Update the store in the stores array
+        setStores(prevStores => 
+          prevStores.map(store => 
+            store.id === selectedStore.id 
+              ? { 
+                  ...store, 
+                  menuPhotos: menuPhotos.map((photo: any) => ({
+                    id: photo.id,
+                    url: photo.photo_url,
+                    thumbnail: photo.photo_url
+                  }))
+                }
+              : store
+          )
+        );
+      } catch (err) {
+        console.error('Error fetching menu photos:', err);
+        // Don't set error state for photos, just log it
+      }
+    };
+
     fetchMenuItems();
+    fetchMenuPhotos(); // Call the new function
   }, [selectedStore?.id]); // Re-fetch when selected store changes
 
   useEffect(() => {
@@ -241,7 +307,7 @@ export default function Addresses() {
     );
   };
 
-  const handleAddProduct = async (product: { name: string; price: number; photo?: File }) => {
+  const handleAddProduct = async (product: { name: string; price: number }) => {
     if (!selectedStore) return;
 
     // Get the highest existing product ID
@@ -251,9 +317,7 @@ export default function Addresses() {
     const newProduct: Product = {
       id: highestId + 1,
       name: product.name,
-      price: product.price,
-      photo: product.photo ? URL.createObjectURL(product.photo) : undefined,
-      image_url: product.photo ? URL.createObjectURL(product.photo) : undefined
+      price: product.price
     };
 
     // Optimistically update the UI
@@ -298,10 +362,7 @@ export default function Addresses() {
       const validatedMenuItems = (data.menuItems || []).map((item: any) => ({
         id: item.id,
         name: item.name,
-        price: item.price,
-        size: item.size || undefined,
-        photo: item.image_url,
-        image_url: item.image_url
+        price: item.price
       }));
 
       setStores(prevStores => 
@@ -359,26 +420,79 @@ export default function Addresses() {
     showToast(`${photos.length} menu photo${photos.length > 1 ? 's' : ''} added successfully!`);
   };
 
-  const handleRemovePhoto = (photoId: number) => {
+  const handleRemovePhoto = async (photoId: number) => {
     if (!selectedStore) return;
 
-    const updatedStores = stores.map(store => {
-      if (store.id === selectedStore.id) {
-        return {
-          ...store,
-          menuPhotos: store.menuPhotos?.filter(photo => photo.id !== photoId)
-        };
-      }
-      return store;
-    });
+    try {
+      setIsDeletingPhoto(photoId); // Set loading state
+      const apiUrl = process.env.API_URL || 'http://localhost:3001';
+      const nextApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+      console.log('Deleting photo with ID:', photoId);
 
-    setStores(updatedStores);
-    setSelectedStore(prevStore => 
-      prevStore ? {
-        ...prevStore,
-        menuPhotos: prevStore.menuPhotos?.filter(photo => photo.id !== photoId)
-      } : null
-    );
+      // Get photo URL from local state
+      const photo = selectedStore.menuPhotos?.find(p => p.id === photoId);
+      if (!photo) {
+        throw new Error('Photo not found in local state');
+      }
+
+      // Extract public ID from Cloudinary URL
+      const matches = photo.url.match(/\/upload\/v\d+\/(.+)$/);
+      if (!matches) {
+        throw new Error('Invalid Cloudinary URL format');
+      }
+      const publicId = matches[1].replace(/\.[^/.]+$/, ""); // Remove file extension
+
+      // Delete from Cloudinary first using this project's API
+      const cloudinaryResponse = await fetch(`${nextApiUrl}/api/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ publicId })
+      });
+
+      if (!cloudinaryResponse.ok) {
+        throw new Error('Failed to delete photo from Cloudinary');
+      }
+
+      // Then delete from database using the other API
+      const deleteResponse = await fetch(`${apiUrl}/api/menu-photos/${photoId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!deleteResponse.ok) {
+        throw new Error(`Failed to delete menu photo from database: ${deleteResponse.status}`);
+      }
+
+      // Update local state after successful deletion
+      const updatedStores = stores.map(store => {
+        if (store.id === selectedStore.id) {
+          return {
+            ...store,
+            menuPhotos: store.menuPhotos?.filter(photo => photo.id !== photoId)
+          };
+        }
+        return store;
+      });
+
+      setStores(updatedStores);
+      setSelectedStore(prevStore => 
+        prevStore ? {
+          ...prevStore,
+          menuPhotos: prevStore.menuPhotos?.filter(photo => photo.id !== photoId)
+        } : null
+      );
+      
+      showToast('Menu photo deleted successfully!');
+    } catch (err) {
+      console.error('Error deleting menu photo:', err);
+      showToast(err instanceof Error ? err.message : 'Failed to delete menu photo. Please try again.');
+    } finally {
+      setIsDeletingPhoto(null); // Clear loading state
+    }
   };
 
   const handleAddAddress = (address: { 
@@ -422,14 +536,13 @@ export default function Addresses() {
     setIsToastVisible(true);
   };
 
-  const handleSaveEditedProduct = (editedProduct: { name: string; price: number; photo?: File }) => {
+  const handleSaveEditedProduct = (editedProduct: { name: string; price: number }) => {
     if (!selectedStore || !selectedProduct) return;
 
     const updatedProduct: Product = {
       id: selectedProduct.product.id,
       name: editedProduct.name,
-      price: editedProduct.price,
-      photo: editedProduct.photo ? URL.createObjectURL(editedProduct.photo) : selectedProduct.product.photo,
+      price: editedProduct.price
     };
 
     setStores(prevStores =>
@@ -653,10 +766,10 @@ export default function Addresses() {
                       <div key={photo.id} className="relative bg-white border border-gray-200 rounded-lg p-4">
                         <div className="flex items-start space-x-4">
                           <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 flex items-center justify-center bg-black text-white rounded-full text-sm font-medium">
-                              {photo.id.toString().padStart(2, '0')}
-                            </div>
-                            <div className="w-32 h-40 relative">
+                            <div 
+                              className="w-32 h-40 relative cursor-pointer"
+                              onClick={() => setSelectedImage({ url: photo.url, alt: `Menu page ${photo.id}` })}
+                            >
                               <Image
                                 src={photo.thumbnail}
                                 alt={`Menu page ${photo.id}`}
@@ -665,11 +778,17 @@ export default function Addresses() {
                                 className="rounded border border-gray-200"
                                 unoptimized
                               />
+                              {isDeletingPhoto === photo.id && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded">
+                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <button 
                             onClick={() => handleRemovePhoto(photo.id)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                            className={`absolute top-4 right-4 text-gray-400 hover:text-gray-600 ${isDeletingPhoto === photo.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isDeletingPhoto === photo.id}
                           >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
@@ -697,25 +816,9 @@ export default function Addresses() {
                         key={product.id}
                         className="grid grid-cols-12 gap-4 py-3 border-b border-gray-100 items-center hover:bg-gray-50"
                       >
-                        <div className="col-span-8 flex items-center space-x-3">
-                          {product.photo && (
-                            <div 
-                              className="w-16 h-16 relative rounded-lg overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => setSelectedImage({ url: product.photo!, alt: product.name })}
-                            >
-                              <Image
-                                src={product.photo}
-                                alt={product.name}
-                                fill
-                                className="object-cover"
-                                unoptimized
-                                sizes="(max-width: 768px) 64px, 64px"
-                                priority
-                              />
-                            </div>
-                          )}
+                        <div className="col-span-8 flex items-center">
                           <span className="text-sm text-gray-900">
-                            {product.name} {product.size && `- ${product.size}`}
+                            {product.name}
                           </span>
                         </div>
                         <div className="col-span-3 text-sm text-gray-900">₱{product.price.toFixed(2)}</div>
@@ -811,6 +914,7 @@ export default function Addresses() {
               isOpen={isAddMenuPhotosModalOpen}
               onClose={() => setIsAddMenuPhotosModalOpen(false)}
               onSave={handleAddMenuPhotos}
+              storeId={selectedStore?.id || 0}
             />
           </>
         )}
@@ -846,22 +950,20 @@ export default function Addresses() {
           </>
         )}
 
-        {/* Image Modal */}
-        {selectedImage && (
-          <ImageModal
-            isOpen={!!selectedImage}
-            onClose={() => setSelectedImage(null)}
-            imageUrl={selectedImage.url}
-            altText={selectedImage.alt}
-          />
-        )}
-
         {/* Toast */}
         <Toast
           message={successMessage}
           isVisible={isToastVisible}
           onClose={() => setIsToastVisible(false)}
           type="success"
+        />
+
+        {/* Image Modal */}
+        <ImageModal
+          isOpen={!!selectedImage}
+          onClose={() => setSelectedImage(null)}
+          imageUrl={selectedImage?.url || ''}
+          altText={selectedImage?.alt || ''}
         />
       </div>
     </>

@@ -1,15 +1,19 @@
 'use client'
 import { useState } from 'react';
 import Image from 'next/image';
+import { uploadFile } from '../lib/cloudinary';
 
 interface AddMenuPhotosModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (photos: File[]) => void;
+  storeId: number;
 }
 
-export const AddMenuPhotosModal = ({ isOpen, onClose, onSave }: AddMenuPhotosModalProps) => {
+export const AddMenuPhotosModal = ({ isOpen, onClose, onSave, storeId }: AddMenuPhotosModalProps) => {
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -20,11 +24,63 @@ export const AddMenuPhotosModal = ({ isOpen, onClose, onSave }: AddMenuPhotosMod
     setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedPhotos.length > 0) {
+    if (selectedPhotos.length === 0) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Upload photos to Cloudinary and get URLs
+      const uploadPromises = selectedPhotos.map(async (photo) => {
+        const reader = new FileReader();
+        const fileDataPromise = new Promise<string | ArrayBuffer | null>((resolve) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(photo);
+        });
+        
+        const fileData = await fileDataPromise;
+        if (typeof fileData === 'string') {
+          const uploadResult = await uploadFile(fileData, "menu-photos");
+          return uploadResult.secure_url;
+        }
+        return null;
+      });
+
+      const uploadedUrls = (await Promise.all(uploadPromises)).filter((url): url is string => url !== null);
+
+      // Make API calls to save each photo URL
+      const apiUrl = process.env.API_URL || 'http://localhost:3001';
+      const apiPromises = uploadedUrls.map(async (photo_url) => {
+        const response = await fetch(`${apiUrl}/api/menu-photos`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            photo_url,
+            store_id: storeId
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to save menu photo');
+        }
+
+        return response.json();
+      });
+
+      await Promise.all(apiPromises);
+
       onSave(selectedPhotos);
       onClose();
+    } catch (err) {
+      console.error('Error saving menu photos:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save menu photos');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -48,6 +104,11 @@ export const AddMenuPhotosModal = ({ isOpen, onClose, onSave }: AddMenuPhotosMod
         </div>
         
         <div className="flex-1 overflow-y-auto px-6 py-4 bg-white">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+              {error}
+            </div>
+          )}
           <div className="space-y-6">
             <div>
               <div className="flex justify-between items-center mb-2">
@@ -127,19 +188,20 @@ export const AddMenuPhotosModal = ({ isOpen, onClose, onSave }: AddMenuPhotosMod
             <button
               type="submit"
               onClick={handleSubmit}
-              disabled={selectedPhotos.length === 0}
+              disabled={selectedPhotos.length === 0 || isLoading}
               className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none ${
-                selectedPhotos.length > 0
+                selectedPhotos.length > 0 && !isLoading
                   ? 'bg-black text-white hover:bg-gray-800' 
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }`}
             >
-              Save Photos
+              {isLoading ? 'Saving...' : 'Save Photos'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none"
+              disabled={isLoading}
+              className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none disabled:opacity-50"
             >
               Cancel
             </button>

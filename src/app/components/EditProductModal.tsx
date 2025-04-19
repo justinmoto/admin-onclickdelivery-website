@@ -1,41 +1,26 @@
 'use client'
 
 import { useState } from 'react';
-import Image from 'next/image';
 
 interface EditProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (product: { name: string; price: number; photo?: File }) => void;
+  onSave: (product: { name: string; price: number }) => void;
   product: {
     name: string;
     price: number;
-    photo?: string;
-    image_url?: string;
   };
 }
 
 export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProductModalProps) => {
   const [productName, setProductName] = useState(product.name);
   const [productPrice, setProductPrice] = useState(product.price.toString());
-  const [productPhoto, setProductPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string>(product.image_url || product.photo || '');
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setProductPhoto(file);
-      const previewUrl = URL.createObjectURL(file);
-      setPhotoPreview(previewUrl);
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
       name: productName,
-      price: parseFloat(productPrice) || 0,
-      photo: productPhoto || undefined
+      price: parseFloat(productPrice) || 0
     });
     onClose();
   };
@@ -61,52 +46,6 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
         
         <div className="flex-1 overflow-y-auto p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Photo Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Product Photo
-              </label>
-              <div 
-                onClick={() => document.getElementById('product-photo-edit')?.click()}
-                className="relative cursor-pointer group"
-              >
-                <div className={`w-full h-48 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors ${photoPreview ? 'border-none' : ''}`}>
-                  {photoPreview ? (
-                    <div className="relative w-full h-full rounded-lg overflow-hidden">
-                      <Image
-                        src={photoPreview}
-                        alt="Product preview"
-                        fill
-                        className="object-cover"
-                        unoptimized
-                        sizes="(max-width: 768px) 100vw, 400px"
-                        priority
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
-                        <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <p className="mt-1 text-sm text-gray-500">Click to upload product photo</p>
-                    </div>
-                  )}
-                </div>
-                <input
-                  id="product-photo-edit"
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  className="hidden"
-                />
-              </div>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Product Name
