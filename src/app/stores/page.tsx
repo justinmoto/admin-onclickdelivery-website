@@ -28,6 +28,7 @@ interface DeliveryFare {
 }
 
 interface Product {
+  id: number;
   name: string;
   price: number;
   size?: string;
@@ -156,30 +157,32 @@ export default function Addresses() {
 
   const handleAddProduct = (product: { name: string; price: number; photo?: File }) => {
     if (!selectedStore) return;
-    
-    const newProduct = {
+
+    const newProduct: Product = {
+      id: Date.now(),
       name: product.name,
       price: product.price,
-      photo: product.photo ? URL.createObjectURL(product.photo) : undefined
+      photo: product.photo ? URL.createObjectURL(product.photo) : undefined,
     };
 
-    const updatedStores = stores.map(store => {
-      if (store.id === selectedStore.id) {
-        return {
-          ...store,
-          products: [...store.products, newProduct]
-        };
-      }
-      return store;
-    });
+    setStores(prevStores =>
+      prevStores.map(store =>
+        store.id === selectedStore.id
+          ? {
+              ...store,
+              products: [...store.products, newProduct],
+            }
+          : store
+      )
+    );
 
-    setStores(updatedStores);
     setSelectedStore(prevStore => 
       prevStore ? {
         ...prevStore,
         products: [...prevStore.products, newProduct]
       } : null
     );
+
     setIsAddProductModalOpen(false);
     showToast('Product added successfully!');
   };
@@ -280,37 +283,31 @@ export default function Addresses() {
   };
 
   const handleSaveEditedProduct = (editedProduct: { name: string; price: number; size?: string; photo?: File }) => {
-    if (!selectedStore || selectedProduct === null) return;
+    if (!selectedStore || !selectedProduct) return;
 
-    const updatedProduct = {
-      ...editedProduct,
-      photo: editedProduct.photo 
-        ? URL.createObjectURL(editedProduct.photo)
-        : selectedStore.products[selectedProduct.index].photo
+    const updatedProduct: Product = {
+      id: selectedProduct.product.id,
+      name: editedProduct.name,
+      price: editedProduct.price,
+      size: editedProduct.size,
+      photo: editedProduct.photo ? URL.createObjectURL(editedProduct.photo) : selectedProduct.product.photo,
     };
 
-    const updatedStores = stores.map(store => {
-      if (store.id === selectedStore.id) {
-        const updatedProducts = [...store.products];
-        updatedProducts[selectedProduct.index] = updatedProduct;
-        return {
-          ...store,
-          products: updatedProducts
-        };
-      }
-      return store;
-    });
-
-    setStores(updatedStores);
-    setSelectedStore(prevStore => 
-      prevStore ? {
-        ...prevStore,
-        products: prevStore.products.map((p, i) => 
-          i === selectedProduct.index ? updatedProduct : p
-        )
-      } : null
+    setStores(prevStores =>
+      prevStores.map(store =>
+        store.id === selectedStore.id
+          ? {
+              ...store,
+              products: store.products.map((p, i) =>
+                i === selectedProduct.index ? updatedProduct : p
+              ),
+            }
+          : store
+      )
     );
+
     setIsEditProductModalOpen(false);
+    setSelectedProduct(null);
     showToast('Product updated successfully!');
   };
 
@@ -541,9 +538,9 @@ export default function Addresses() {
                     <div className="col-span-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Price</div>
                     <div className="col-span-1"></div>
                   </div>
-                  {selectedStore.products.map((product, index) => (
+                  {selectedStore.products.map((product) => (
                     <div
-                      key={index}
+                      key={product.id}
                       className="grid grid-cols-12 gap-4 py-3 border-b border-gray-100 items-center hover:bg-gray-50"
                     >
                       <div className="col-span-8 flex items-center space-x-3">
@@ -565,21 +562,21 @@ export default function Addresses() {
                       <div className="col-span-1 text-right">
                         <div className="relative">
                           <button 
-                            onClick={() => setOpenMenuIndex(openMenuIndex === index ? null : index)}
+                            onClick={() => setOpenMenuIndex(openMenuIndex === product.id ? null : product.id)}
                             className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
                           >
                             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
                             </svg>
                           </button>
-                          {openMenuIndex === index && (
+                          {openMenuIndex === product.id && (
                             <div 
-                              id={`product-menu-${index}`}
+                              id={`product-menu-${product.id}`}
                               className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200"
                             >
                               <button
                                 onClick={() => {
-                                  handleEditProduct(index, product);
+                                  handleEditProduct(selectedStore.products.findIndex(p => p.id === product.id), product);
                                   setOpenMenuIndex(null);
                                 }}
                                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
@@ -588,7 +585,7 @@ export default function Addresses() {
                               </button>
                               <button
                                 onClick={() => {
-                                  handleDeleteProduct(index);
+                                  handleDeleteProduct(selectedStore.products.findIndex(p => p.id === product.id));
                                   setOpenMenuIndex(null);
                                 }}
                                 className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"

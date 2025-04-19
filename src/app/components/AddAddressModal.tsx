@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { useLoadScript, GoogleMap, Marker } from "@react-google-maps/api";
+import { GoogleMap, Marker } from "@react-google-maps/api";
 import usePlacesAutocomplete, {
   getGeocode,
   getLatLng,
@@ -70,12 +70,6 @@ export const AddAddressModal = ({
     location: "",
     address: "",
     logo: null,
-  });
-
-  // Load Google Maps script
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries,
   });
 
   // Places Autocomplete setup
@@ -410,10 +404,10 @@ export const AddAddressModal = ({
                   type="text"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  disabled={!isLoaded || !ready}
+                  disabled={!ready}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
                   placeholder={
-                    !isLoaded || !ready ? "Loading..." : "Search for address"
+                    !ready ? "Loading..." : "Search for address"
                   }
                 />
 
@@ -463,32 +457,30 @@ export const AddAddressModal = ({
 
               {/* Map */}
               <div className="h-[200px] rounded-lg overflow-hidden border border-gray-200">
-                {isLoaded && (
-                  <GoogleMap
-                    center={form.coordinates || { lat: 7.4478, lng: 125.8037 }} // Default to Tagum City
-                    zoom={15}
-                    mapContainerStyle={{ width: "100%", height: "100%" }}
-                    onClick={handleMapClick}
-                    options={{
-                      streetViewControl: false,
-                      mapTypeControl: false,
-                    }}
-                  >
-                    {form.coordinates && (
-                      <Marker
-                        position={form.coordinates}
-                        draggable={true}
-                        onDragEnd={(e) => {
-                          if (e.latLng) {
-                            handleMapClick({
-                              latLng: e.latLng,
-                            } as google.maps.MapMouseEvent);
-                          }
-                        }}
-                      />
-                    )}
-                  </GoogleMap>
-                )}
+                <GoogleMap
+                  center={form.coordinates || { lat: 7.4478, lng: 125.8037 }} // Default to Tagum City
+                  zoom={15}
+                  mapContainerStyle={{ width: "100%", height: "100%" }}
+                  onClick={handleMapClick}
+                  options={{
+                    streetViewControl: false,
+                    mapTypeControl: false,
+                  }}
+                >
+                  {form.coordinates && (
+                    <Marker
+                      position={form.coordinates}
+                      draggable={true}
+                      onDragEnd={(e) => {
+                        if (e.latLng) {
+                          handleMapClick({
+                            latLng: e.latLng,
+                          } as google.maps.MapMouseEvent);
+                        }
+                      }}
+                    />
+                  )}
+                </GoogleMap>
               </div>
 
               {/* Selected Address Display */}
