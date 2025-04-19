@@ -11,10 +11,10 @@ import { EditProductModal } from '../components/EditProductModal';
 import { Toast } from '../components/Toast';
 
 interface Store {
-  id: string;
+  id: number;
   name: string;
   location: string;
-  logo?: string;
+  logo_url?: string;
   isPhotoMenu: boolean;
   products: Product[];
   menuPhotos?: MenuPhoto[];
@@ -55,10 +55,70 @@ export default function Addresses() {
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [nextId, setNextId] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const apiUrl = process.env.API_URL || 'http://localhost:3001';
+        
+        // Log the API URL for debugging
+        console.log('API URL from env:', apiUrl);
+        
+        if (!apiUrl) {
+          console.error('API URL is not configured in environment variables');
+          throw new Error('API URL is not configured');
+        }
+
+        const url = `${apiUrl}/api/stores`;
+        console.log('Fetching stores from:', url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Server response:', errorText);
+          throw new Error(`Failed to fetch stores: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Received stores data:', data);
+        
+        if (!data.stores || !Array.isArray(data.stores)) {
+          console.error('Invalid response format:', data);
+          throw new Error('Invalid response format: stores array not found');
+        }
+
+        const formattedStores = data.stores.map((store: any) => ({
+          ...store,
+          isPhotoMenu: false,
+          products: [],
+          menuPhotos: []
+        }));
+        
+        setStores(formattedStores);
+      } catch (err) {
+        console.error('Error fetching stores:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch stores');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStores();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -188,11 +248,11 @@ export default function Addresses() {
     logo?: File;
   }) => {
     const newStore: Store = {
-      id: nextId.toString(),
+      id: nextId,
       name: address.tradeName,
       location: address.address,
       category: address.category,
-      logo: address.logo ? URL.createObjectURL(address.logo) : undefined,
+      logo_url: address.logo ? URL.createObjectURL(address.logo) : undefined,
       isPhotoMenu: false,
       products: [],
       menuPhotos: []
@@ -324,44 +384,53 @@ export default function Addresses() {
             <div className="px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
               Name
             </div>
-            {filteredStores.map((store) => (
-              <div
-                key={store.id}
-                className={`px-4 py-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between ${
-                  selectedStore?.id === store.id ? 'bg-gray-100' : ''
-                }`}
-                onClick={() => setSelectedStore(store)}
-              >
-                <div className="flex items-center space-x-3 min-w-0">
-                  {store.logo ? (
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
-                      <Image
-                        src={store.logo}
-                        alt={store.name}
-                        width={32}
-                        height={32}
-                        className="object-cover w-full h-full"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200">
-                      <span className="text-sm text-gray-500">
-                        {store.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center space-x-1">
-                      <span className="text-sm text-gray-900 truncate">{store.name}</span>
-                      <span className="text-xs text-gray-500">📍</span>
-                    </div>
-                    {store.category && (
-                      <span className="text-xs text-gray-500 truncate block">{store.category}</span>
+            {isLoading ? (
+              <div className="px-4 py-3 text-sm text-gray-600">Loading stores...</div>
+            ) : error ? (
+              <div className="px-4 py-3 text-sm text-red-600">{error}</div>
+            ) : filteredStores.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-600">No stores found</div>
+            ) : (
+              filteredStores.map((store) => (
+                <div
+                  key={store.id}
+                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between ${
+                    selectedStore?.id === store.id ? 'bg-gray-100' : ''
+                  }`}
+                  onClick={() => setSelectedStore(store)}
+                >
+                  <div className="flex items-center space-x-3 min-w-0">
+                    {store.logo_url ? (
+                      <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
+                        <Image
+                          src={store.logo_url}
+                          alt={store.name}
+                          width={32}
+                          height={32}
+                          unoptimized
+                          className="object-cover w-full h-full"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200">
+                        <span className="text-sm text-gray-500">
+                          {store.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
                     )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center space-x-1">
+                        <span className="text-sm text-gray-900 truncate">{store.name}</span>
+                        <span className="text-xs text-gray-500">📍</span>
+                      </div>
+                      {store.category && (
+                        <span className="text-xs text-gray-500 truncate block">{store.category}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -371,10 +440,10 @@ export default function Addresses() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  {selectedStore.logo && (
+                  {selectedStore.logo_url && (
                     <div className="w-12 h-12 rounded-full overflow-hidden mr-4 border border-gray-200">
                       <Image
-                        src={selectedStore.logo}
+                        src={selectedStore.logo_url}
                         alt={selectedStore.name}
                         width={48}
                         height={48}
