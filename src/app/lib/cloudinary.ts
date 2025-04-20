@@ -17,7 +17,7 @@ export interface UploadResponse {
     folder?: string
   ): Promise<UploadResponse> {
     try {
-      const apiUrl = process.env.CLOUDINARY_API_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_CLOUDINARY_API_URL;
       const uploadResult = await fetch(`${apiUrl}/api/upload`, {
         method: 'POST',
         headers: {

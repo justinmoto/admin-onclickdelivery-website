@@ -70,8 +70,6 @@ export default function Addresses() {
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
   const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false);
 
-  const apiUrl = process.env.MYSQL_API_URL;
-
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -83,7 +81,7 @@ export default function Addresses() {
 
       try {
         setError(null); // Clear any previous errors
-        const apiUrl = process.env.MYSQL_API_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
         const response = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
           method: 'GET',
           headers: {
@@ -167,7 +165,7 @@ export default function Addresses() {
       if (!selectedStore?.id) return;
 
       try {
-        const apiUrl = process.env.MYSQL_API_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
         const response = await fetch(`${apiUrl}/api/menu-photos?store_id=${selectedStore.id}`, {
           method: 'GET',
           headers: {
@@ -239,7 +237,7 @@ export default function Addresses() {
       try {
         setIsLoading(true);
         setError(null);
-        const apiUrl = process.env.MYSQL_API_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
         
         // Log the API URL for debugging
         console.log('API URL from env:', apiUrl);
@@ -358,7 +356,7 @@ export default function Addresses() {
 
     // Refetch menu items to get the updated list from the server
     try {
-      const apiUrl = process.env.MYSQL_API_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
       const response = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
         method: 'GET',
         headers: {
@@ -439,8 +437,8 @@ export default function Addresses() {
 
     try {
       setIsDeletingPhoto(photoId); // Set loading state
-      const apiUrl = process.env.MYSQL_API_URL;
-      const nextApiUrl = process.env.CLOUDINARY_API_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
+      const nextApiUrl = process.env.NEXT_PUBLIC_CLOUDINARY_API_URL;
       console.log('Deleting photo with ID:', photoId);
 
       // Get photo URL from local state
@@ -620,7 +618,7 @@ export default function Addresses() {
         const matches = storeToDelete.logo_url.match(/\/upload\/v\d+\/(.+)$/);
         if (matches && matches[1]) {
           const publicId = matches[1].replace(/\.[^/.]+$/, "");
-          const cloudinaryApiUrl = process.env.CLOUDINARY_API_URL;
+          const cloudinaryApiUrl = process.env.NEXT_PUBLIC_CLOUDINARY_API_URL;
           
           try {
             const deleteResponse = await fetch(`${cloudinaryApiUrl}/api/delete`, {
@@ -641,7 +639,7 @@ export default function Addresses() {
       }
       
       // Then delete the store from the database
-      const apiUrl = process.env.MYSQL_API_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
       const response = await fetch(`${apiUrl}/api/stores/${storeToDelete.id}`, {
         method: 'DELETE',
         headers: {
@@ -701,7 +699,7 @@ export default function Addresses() {
         return;
       }
 
-      const apiUrl = process.env.MYSQL_API_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
       const importedProducts: Array<Product> = [];
 
       // Add products one at a time
@@ -941,7 +939,7 @@ export default function Addresses() {
                 <div className="flex items-center">
                   {selectedStore.logo_url && (
                     <div className="w-12 h-12 rounded-full overflow-hidden mr-4 border border-gray-200">
-                      <Image
+          <Image
                         src={selectedStore.logo_url}
                         alt={selectedStore.name}
                         width={48}
@@ -1031,8 +1029,8 @@ export default function Addresses() {
                             <div 
                               className="w-32 h-40 relative cursor-pointer"
                               onClick={() => setSelectedImage({ url: photo.url, alt: `Menu page ${photo.id}` })}
-                            >
-                              <Image
+        >
+          <Image
                                 src={photo.thumbnail}
                                 alt={`Menu page ${photo.id}`}
                                 layout="fill"
@@ -1274,7 +1272,7 @@ export default function Addresses() {
             />
           </>
         )}
-      </div>
+    </div>
     </>
   );
-} 
+}

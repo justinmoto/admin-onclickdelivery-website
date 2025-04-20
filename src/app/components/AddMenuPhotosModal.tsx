@@ -51,7 +51,7 @@ export const AddMenuPhotosModal = ({ isOpen, onClose, onSave, storeId }: AddMenu
       const uploadedUrls = (await Promise.all(uploadPromises)).filter((url): url is string => url !== null);
 
       // Make API calls to save each photo URL
-      const apiUrl = process.env.MYSQL_API_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
       const apiPromises = uploadedUrls.map(async (photo_url) => {
         const response = await fetch(`${apiUrl}/api/menu-photos`, {
           method: 'POST',

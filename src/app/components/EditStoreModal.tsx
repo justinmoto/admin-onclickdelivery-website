@@ -226,7 +226,7 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
           const matches = store.logo_url.match(/\/upload\/v\d+\/(.+)$/);
           if (matches && matches[1]) {
             const publicId = matches[1].replace(/\.[^/.]+$/, "");
-            const cloudinaryApiUrl = process.env.CLOUDINARY_API_URL;
+            const cloudinaryApiUrl = process.env.NEXT_PUBLIC_CLOUDINARY_API_URL;
             
             try {
               const deleteResponse = await fetch(`${cloudinaryApiUrl}/api/cloudinary/delete`, {
@@ -246,7 +246,7 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
           }
         }
 
-        // Upload new logo using CLOUDINARY_API_URL
+        // Upload new logo using NEXT_PUBLIC_CLOUDINARY_API_URL
         const reader = new FileReader();
         const fileDataPromise = new Promise<string | ArrayBuffer | null>((resolve) => {
           reader.onloadend = () => resolve(reader.result);
@@ -260,8 +260,8 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
         }
       }
 
-      // Make API call to update store using MYSQL_API_URL
-      const apiUrl = process.env.MYSQL_API_URL;
+      // Make API call to update store using NEXT_PUBLIC_MYSQL_API_URL
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
       const requestBody = {
         name: form.name,
         category: form.category,
