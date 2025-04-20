@@ -261,7 +261,7 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
       }
 
       // Make API call to update store using MYSQL_API_URL
-      const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.MYSQL_API_URL;
       const requestBody = {
         name: form.name,
         category: form.category,

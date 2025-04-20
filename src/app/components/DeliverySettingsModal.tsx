@@ -23,7 +23,7 @@ export const DeliverySettingsModal = ({ isOpen, onClose, onSave }: DeliverySetti
   const [exampleDistance, setExampleDistance] = useState<number | ''>(1);
   const [isLoading, setIsLoading] = useState(false);
 
-  const apiUrl = process.env.MYSQL_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.MYSQL_API_URL;
 
   useEffect(() => {
     if (isOpen) {
