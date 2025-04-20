@@ -11,9 +11,10 @@ interface DeliveryFare {
 interface DeliverySettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSave: (settings: DeliveryFare) => void;
 }
 
-export const DeliverySettingsModal = ({ isOpen, onClose }: DeliverySettingsModalProps) => {
+export const DeliverySettingsModal = ({ isOpen, onClose, onSave }: DeliverySettingsModalProps) => {
   const [deliveryFare, setDeliveryFare] = useState<DeliveryFare>({
     base_fare: 0,
     rate_per_km: 0,
@@ -74,6 +75,7 @@ export const DeliverySettingsModal = ({ isOpen, onClose }: DeliverySettingsModal
       }
 
       toast.success('Fare rates updated successfully');
+      onSave(deliveryFare);
       onClose();
     } catch (error) {
       console.error('Error updating fare rates:', error);
