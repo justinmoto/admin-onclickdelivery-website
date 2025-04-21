@@ -37,12 +37,37 @@ interface Product {
   id: number;
   name: string;
   price: number;
+  size?: string;
+  image_url?: string;
 }
 
 interface MenuPhoto {
   id: number;
   url: string;
   thumbnail: string;
+}
+
+interface ApiMenuItem {
+  id: number;
+  name: string;
+  price: number;
+  size?: string;
+  image_url?: string;
+}
+
+interface ApiMenuPhoto {
+  id: number;
+  photo_url: string;
+}
+
+interface ApiStore {
+  id: number;
+  name: string;
+  location: string;
+  logo_url?: string;
+  category: string;
+  longitude: number;
+  latitude: number;
 }
 
 export default function Addresses() {
@@ -119,7 +144,7 @@ export default function Addresses() {
         const menuItems = data.menuItems || [];
         
         // Debug log to check product data
-        console.log('Menu items with photos:', menuItems.map((item: any) => ({
+        console.log('Menu items with photos:', menuItems.map((item: ApiMenuItem) => ({
           id: item.id,
           name: item.name,
           photo: item.image_url,
@@ -127,7 +152,7 @@ export default function Addresses() {
         })));
 
         // Ensure all required fields are present and photo URLs are properly formatted
-        const validatedMenuItems = menuItems.map((item: any) => ({
+        const validatedMenuItems = menuItems.map((item: ApiMenuItem) => ({
           id: item.id,
           name: item.name,
           price: item.price,
@@ -199,7 +224,7 @@ export default function Addresses() {
           if (!prevStore) return null;
           return {
             ...prevStore,
-            menuPhotos: menuPhotos.map((photo: any) => ({
+            menuPhotos: menuPhotos.map((photo: ApiMenuPhoto) => ({
               id: photo.id,
               url: photo.photo_url,
               thumbnail: photo.photo_url
@@ -213,7 +238,7 @@ export default function Addresses() {
             store.id === selectedStore.id 
               ? { 
                   ...store, 
-                  menuPhotos: menuPhotos.map((photo: any) => ({
+                  menuPhotos: menuPhotos.map((photo: ApiMenuPhoto) => ({
                     id: photo.id,
                     url: photo.photo_url,
                     thumbnail: photo.photo_url
@@ -271,7 +296,7 @@ export default function Addresses() {
           throw new Error('Invalid response format: stores array not found');
         }
 
-        const formattedStores = data.stores.map((store: any) => ({
+        const formattedStores = data.stores.map((store: ApiStore) => ({
           ...store,
           isPhotoMenu: false,
           products: [],
@@ -371,7 +396,7 @@ export default function Addresses() {
       const data = await response.json();
       
       // Update with the fresh data from the server
-      const validatedMenuItems = (data.menuItems || []).map((item: any) => ({
+      const validatedMenuItems = (data.menuItems || []).map((item: ApiMenuItem) => ({
         id: item.id,
         name: item.name,
         price: item.price
