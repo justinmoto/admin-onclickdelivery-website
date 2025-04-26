@@ -13,6 +13,7 @@ import { ImageModal } from './components/ImageModal';
 import { EditStoreModal } from './components/EditStoreModal';
 import { DeleteStoreModal } from './components/DeleteStoreModal';
 import { toast } from 'react-hot-toast';
+import { DeleteProductModal } from './components/DeleteProductModal';
 
 interface Store {
   id: number;
@@ -40,6 +41,7 @@ interface Product {
   price: number;
   size?: string;
   image_url?: string;
+  store_id: number;
 }
 
 interface MenuPhoto {
@@ -96,6 +98,9 @@ export default function Addresses() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
   const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false);
+  const [isDeleteProductModalOpen, setIsDeleteProductModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<{ index: number; product: Product } | null>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState<number | null>(null);
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -139,19 +144,19 @@ export default function Addresses() {
         }
 
         const data = await response.json();
-        console.log('Raw API Response:', data);
-        console.log('Menu Items Structure:', data.menuItems ? data.menuItems[0] : 'No items');
+        // console.log('Raw API Response:', data);
+        // console.log('Menu Items Structure:', data.menuItems ? data.menuItems[0] : 'No items');
 
         // If menuItems is null/undefined or empty array, set empty array
         const menuItems = data.menuItems || [];
         
         // Debug log to check product data
-        console.log('Menu items with photos:', menuItems.map((item: ApiMenuItem) => ({
-          id: item.id,
-          name: item.name,
-          photo: item.image_url,
-          photoUrl: item.image_url ? `Complete photo URL: ${item.image_url}` : 'No photo'
-        })));
+        // console.log('Menu items with photos:', menuItems.map((item: ApiMenuItem) => ({
+        //   id: item.id,
+        //   name: item.name,
+        //   photo: item.image_url,
+        //   photoUrl: item.image_url ? `Complete photo URL: ${item.image_url}` : 'No photo'
+        // })));
 
         // Ensure all required fields are present and photo URLs are properly formatted
         const validatedMenuItems = menuItems.map((item: ApiMenuItem) => ({
@@ -163,7 +168,7 @@ export default function Addresses() {
           image_url: item.image_url
         }));
 
-        console.log('Validated menu items:', validatedMenuItems);
+        // console.log('Validated menu items:', validatedMenuItems);
 
         // Update the selected store's products
         setSelectedStore(prevStore => {
@@ -216,7 +221,7 @@ export default function Addresses() {
         }
 
         const data = await response.json();
-        console.log('Menu Photos Response:', data);
+        // console.log('Menu Photos Response:', data);
 
         // Ensure menuPhotos is an array
         const menuPhotos = data.menuPhotos || [];
@@ -267,7 +272,7 @@ export default function Addresses() {
         const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
         
         // Log the API URL for debugging
-        console.log('API URL from env:', apiUrl);
+        // console.log('API URL from env:', apiUrl);
         
         if (!apiUrl) {
           console.error('API URL is not configured in environment variables');
@@ -356,7 +361,8 @@ export default function Addresses() {
     const newProduct: Product = {
       id: highestId + 1,
       name: product.name,
-      price: product.price
+      price: product.price,
+      store_id: selectedStore.id
     };
 
     // Optimistically update the UI
@@ -569,7 +575,15 @@ export default function Addresses() {
   };
 
   const handleEditProduct = (index: number, product: Product) => {
-    setSelectedProduct({ index, product });
+    if (!selectedStore) return;
+    
+    // Ensure store_id is included in the product data
+    const productWithStoreId = {
+      ...product,
+      store_id: selectedStore.id
+    };
+    
+    setSelectedProduct({ index, product: productWithStoreId });
     setIsEditProductModalOpen(true);
   };
 
@@ -578,61 +592,121 @@ export default function Addresses() {
     setIsToastVisible(true);
   };
 
-  const handleSaveEditedProduct = (editedProduct: { name: string; price: number }) => {
+  const handleSaveEditedProduct = async (editedProduct: { name: string; price: number }) => {
     if (!selectedStore || !selectedProduct) return;
 
-    const updatedProduct: Product = {
-      id: selectedProduct.product.id,
-      name: editedProduct.name,
-      price: editedProduct.price
-    };
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
+      const response = await fetch(`${apiUrl}/api/menu-items/${selectedProduct.product.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editedProduct.name,
+          price: editedProduct.price,
+          store_id: selectedStore.id
+        }),
+      });
 
-    setStores(prevStores =>
-      prevStores.map(store =>
-        store.id === selectedStore.id
-          ? {
-              ...store,
-              products: store.products.map((p, i) =>
-                i === selectedProduct.index ? updatedProduct : p
-              ),
-            }
-          : store
-      )
-    );
-
-    setIsEditProductModalOpen(false);
-    setSelectedProduct(null);
-    showToast('Product updated successfully!');
-  };
-
-  const handleDeleteProduct = (index: number) => {
-    if (!selectedStore) return;
-
-    const updatedStores = stores.map(store => {
-      if (store.id === selectedStore.id) {
-        const updatedProducts = store.products.filter((_, i) => i !== index);
-        return {
-          ...store,
-          products: updatedProducts
-        };
+      if (!response.ok) {
+        throw new Error(`Failed to update product: ${response.status}`);
       }
-      return store;
-    });
 
-    setStores(updatedStores);
-    setSelectedStore(prevStore => 
-      prevStore ? {
-        ...prevStore,
-        products: prevStore.products.filter((_, i) => i !== index)
-      } : null
-    );
-    showToast('Product deleted successfully!');
+      const updatedProduct = await response.json();
+
+      // Update local state with the response from the server
+      const productToUpdate: Product = {
+        id: updatedProduct.menuItem.id,
+        name: updatedProduct.menuItem.name,
+        price: Number(updatedProduct.menuItem.price),
+        store_id: selectedStore.id
+      };
+
+      setStores(prevStores =>
+        prevStores.map(store =>
+          store.id === selectedStore.id
+            ? {
+                ...store,
+                products: store.products.map((p, i) =>
+                  i === selectedProduct.index ? productToUpdate : p
+                ),
+              }
+            : store
+        )
+      );
+
+      setSelectedStore(prevStore => {
+        if (!prevStore) return null;
+        return {
+          ...prevStore,
+          products: prevStore.products.map((p, i) =>
+            i === selectedProduct.index ? productToUpdate : p
+          ),
+        };
+      });
+
+      setIsEditProductModalOpen(false);
+      setSelectedProduct(null);
+      showToast('Product updated successfully!');
+    } catch (error) {
+      console.error('Error updating product:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to update product');
+    }
   };
 
-  const handleDeleteClick = (store: Store) => {
-    setStoreToDelete(store);
-    setIsDeleteModalOpen(true);
-    setOpenStoreMenuId(null);
+  const handleDeleteClick = (index: number, product: Product) => {
+    setProductToDelete({ index, product });
+    setIsDeleteProductModalOpen(true);
+    setOpenMenuIndex(null);
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!selectedStore || !productToDelete) return;
+    
+    try {
+      setIsDeletingProduct(productToDelete.product.id);
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
+      
+      const response = await fetch(`${apiUrl}/api/menu-items/${productToDelete.product.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete product: ${response.status}`);
+      }
+
+      // Update local state after successful deletion
+      setStores(prevStores =>
+        prevStores.map(store =>
+          store.id === selectedStore.id
+            ? {
+                ...store,
+                products: store.products.filter((_, i) => i !== productToDelete.index)
+              }
+            : store
+        )
+      );
+
+      setSelectedStore(prevStore => 
+        prevStore ? {
+          ...prevStore,
+          products: prevStore.products.filter((_, i) => i !== productToDelete.index)
+        } : null
+      );
+
+      showToast('Product deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to delete product');
+    } finally {
+      setIsDeletingProduct(null);
+      setIsDeleteProductModalOpen(false);
+      setProductToDelete(null);
+    }
   };
 
   const handleDeleteStore = async () => {
@@ -763,7 +837,8 @@ export default function Addresses() {
             const importedProduct: Product = {
               id: result.menuItem.id,
               name: result.menuItem.name,
-              price: Number(result.menuItem.price) || 0
+              price: Number(result.menuItem.price) || 0,
+              store_id: selectedStore.id
             };
             importedProducts.push(importedProduct);
           }
@@ -943,7 +1018,7 @@ export default function Addresses() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteClick(store);
+                            handleDeleteClick(0, store);
                           }}
                           className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"
                         >
@@ -1137,10 +1212,7 @@ export default function Addresses() {
                                   Edit Product
                                 </button>
                                 <button
-                                  onClick={() => {
-                                    handleDeleteProduct(index);
-                                    setOpenMenuIndex(null);
-                                  }}
+                                  onClick={() => handleDeleteClick(index, product)}
                                   className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"
                                 >
                                   Delete Product
@@ -1299,6 +1371,18 @@ export default function Addresses() {
             />
           </>
         )}
+
+        {/* Delete Product Modal */}
+        <DeleteProductModal
+          isOpen={isDeleteProductModalOpen}
+          onClose={() => {
+            setIsDeleteProductModalOpen(false);
+            setProductToDelete(null);
+          }}
+          onConfirm={handleDeleteProduct}
+          productName={productToDelete?.product.name || ''}
+          isLoading={isDeletingProduct === productToDelete?.product.id}
+        />
     </div>
     </>
   );

@@ -7,22 +7,58 @@ interface EditProductModalProps {
   onClose: () => void;
   onSave: (product: { name: string; price: number }) => void;
   product: {
+    id: number;
     name: string;
     price: number;
+    store_id: number;
   };
 }
 
 export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProductModalProps) => {
   const [productName, setProductName] = useState(product.name);
   const [productPrice, setProductPrice] = useState(product.price.toString());
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      name: productName,
-      price: parseFloat(productPrice) || 0
-    });
-    onClose();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
+      const response = await fetch(`${apiUrl}/api/menu-items/${product.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: productName,
+          price: parseFloat(productPrice),
+          store_id: product.store_id
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to update product: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Product updated:', data);
+      
+      onSave({
+        name: productName,
+        price: parseFloat(productPrice) || 0
+      });
+      
+      onClose();
+    } catch (err) {
+      console.error('Error updating product:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update product');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -45,6 +81,12 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
         </div>
         
         <div className="flex-1 overflow-y-auto p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -82,15 +124,17 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                disabled={isLoading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-black rounded-md hover:bg-gray-800 focus:outline-none"
+                className="px-4 py-2 text-sm font-medium text-white bg-black rounded-md hover:bg-gray-800 disabled:opacity-50"
+                disabled={isLoading}
               >
-                Save Changes
+                {isLoading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>
