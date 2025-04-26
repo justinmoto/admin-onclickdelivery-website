@@ -14,6 +14,7 @@ import { EditStoreModal } from './components/EditStoreModal';
 import { DeleteStoreModal } from './components/DeleteStoreModal';
 import { toast } from 'react-hot-toast';
 import { DeleteProductModal } from './components/DeleteProductModal';
+import { BulkDeleteModal } from './components/BulkDeleteModal';
 
 interface Store {
   id: number;
@@ -101,6 +102,9 @@ export default function Addresses() {
   const [isDeleteProductModalOpen, setIsDeleteProductModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<{ index: number; product: Product } | null>(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState<number | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -897,6 +901,80 @@ export default function Addresses() {
     }
   };
 
+  const handleSelectProduct = (productId: number) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllProducts = (checked: boolean) => {
+    if (checked && selectedStore) {
+      setSelectedProducts(new Set(selectedStore.products.map(p => p.id)));
+    } else {
+      setSelectedProducts(new Set());
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedStore || selectedProducts.size === 0) return;
+    
+    try {
+      setIsDeletingBulk(true);
+      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
+      
+      // Delete each selected product
+      const deletePromises = Array.from(selectedProducts).map(productId =>
+        fetch(`${apiUrl}/api/menu-items/${productId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+      );
+
+      const results = await Promise.all(deletePromises);
+      const failedDeletions = results.filter(r => !r.ok).length;
+
+      if (failedDeletions > 0) {
+        throw new Error(`Failed to delete ${failedDeletions} products`);
+      }
+
+      // Update local state after successful deletion
+      setStores(prevStores =>
+        prevStores.map(store =>
+          store.id === selectedStore.id
+            ? {
+                ...store,
+                products: store.products.filter(product => !selectedProducts.has(product.id))
+              }
+            : store
+        )
+      );
+
+      setSelectedStore(prevStore => 
+        prevStore ? {
+          ...prevStore,
+          products: prevStore.products.filter(product => !selectedProducts.has(product.id))
+        } : null
+      );
+
+      showToast(`Successfully deleted ${selectedProducts.size} products`);
+      setSelectedProducts(new Set());
+    } catch (error) {
+      console.error('Error deleting products:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to delete products');
+    } finally {
+      setIsDeletingBulk(false);
+      setIsBulkDeleteModalOpen(false);
+    }
+  };
+
   return (
     <>
       <Head>
@@ -1163,8 +1241,30 @@ export default function Addresses() {
                 </div>
               ) : (
                 <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-black border-gray-300 rounded focus:ring-black"
+                        checked={selectedStore.products.length > 0 && selectedProducts.size === selectedStore.products.length}
+                        onChange={(e) => handleSelectAllProducts(e.target.checked)}
+                      />
+                      <span className="ml-2 text-sm text-gray-500">
+                        {selectedProducts.size} selected
+                      </span>
+                    </div>
+                    {selectedProducts.size > 0 && (
+                      <button
+                        onClick={() => setIsBulkDeleteModalOpen(true)}
+                        className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700"
+                      >
+                        Delete Selected
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-12 gap-4 py-2 border-b border-gray-200">
-                    <div className="col-span-8 text-xs font-medium text-gray-500 uppercase tracking-wider">Product</div>
+                    <div className="col-span-1"></div>
+                    <div className="col-span-7 text-xs font-medium text-gray-500 uppercase tracking-wider">Product</div>
                     <div className="col-span-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Price</div>
                     <div className="col-span-1"></div>
                   </div>
@@ -1178,7 +1278,15 @@ export default function Addresses() {
                         key={`product-${product.id}-${index}`}
                         className="grid grid-cols-12 gap-4 py-3 border-b border-gray-100 items-center hover:bg-gray-50"
                       >
-                        <div className="col-span-8 flex items-center">
+                        <div className="col-span-1">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 text-black border-gray-300 rounded focus:ring-black"
+                            checked={selectedProducts.has(product.id)}
+                            onChange={() => handleSelectProduct(product.id)}
+                          />
+                        </div>
+                        <div className="col-span-7 flex items-center">
                           <span className="text-sm text-gray-900">
                             {product.name}
                           </span>
@@ -1382,6 +1490,15 @@ export default function Addresses() {
           onConfirm={handleDeleteProduct}
           productName={productToDelete?.product.name || ''}
           isLoading={isDeletingProduct === productToDelete?.product.id}
+        />
+
+        {/* Bulk Delete Modal */}
+        <BulkDeleteModal
+          isOpen={isBulkDeleteModalOpen}
+          onClose={() => setIsBulkDeleteModalOpen(false)}
+          onConfirm={handleBulkDelete}
+          isLoading={isDeletingBulk}
+          itemCount={selectedProducts.size}
         />
     </div>
     </>
