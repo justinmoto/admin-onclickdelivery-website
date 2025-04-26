@@ -463,7 +463,6 @@ export default function Addresses() {
     try {
       setIsDeletingPhoto(photoId); // Set loading state
       const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      const nextApiUrl = process.env.NEXT_PUBLIC_CLOUDINARY_API_URL;
       console.log('Deleting photo with ID:', photoId);
 
       // Get photo URL from local state
@@ -480,7 +479,7 @@ export default function Addresses() {
       const publicId = matches[1].replace(/\.[^/.]+$/, ""); // Remove file extension
 
       // Delete from Cloudinary first using this project's API
-      const cloudinaryResponse = await fetch(`${nextApiUrl}/api/delete`, {
+      const cloudinaryResponse = await fetch(`/api/delete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -643,10 +642,9 @@ export default function Addresses() {
         const matches = storeToDelete.logo_url.match(/\/upload\/v\d+\/(.+)$/);
         if (matches && matches[1]) {
           const publicId = matches[1].replace(/\.[^/.]+$/, "");
-          const cloudinaryApiUrl = process.env.NEXT_PUBLIC_CLOUDINARY_API_URL;
           
           try {
-            const deleteResponse = await fetch(`${cloudinaryApiUrl}/api/delete`, {
+            const deleteResponse = await fetch(`/api/delete`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

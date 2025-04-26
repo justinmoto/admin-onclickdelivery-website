@@ -1,7 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { uploadFile } from '../lib/cloudinary';
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import usePlacesAutocomplete, {
@@ -9,8 +9,6 @@ import usePlacesAutocomplete, {
   getLatLng,
 } from "use-places-autocomplete";
 
-// Define libraries array as a static constant
-const libraries: ("places")[] = ["places"];
 
 interface Store {
   id: number;
@@ -226,10 +224,9 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
           const matches = store.logo_url.match(/\/upload\/v\d+\/(.+)$/);
           if (matches && matches[1]) {
             const publicId = matches[1].replace(/\.[^/.]+$/, "");
-            const cloudinaryApiUrl = process.env.NEXT_PUBLIC_CLOUDINARY_API_URL;
             
             try {
-              const deleteResponse = await fetch(`${cloudinaryApiUrl}/api/cloudinary/delete`, {
+              const deleteResponse = await fetch(`/api/cloudinary/delete`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -287,7 +284,7 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
         try {
           const errorData = JSON.parse(errorText);
           throw new Error(errorData.message || `Failed to update store: ${response.status}`);
-        } catch (parseError) {
+        } catch {
           throw new Error(`Server error: ${response.status} - ${errorText || 'No error details available'}`);
         }
       }

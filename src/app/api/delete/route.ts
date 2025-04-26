@@ -5,7 +5,12 @@ interface CloudinaryDeleteResult {
   result: string;
 }
 
-type CloudinaryCallback = (error: any, result: CloudinaryDeleteResult | undefined) => void;
+interface CloudinaryError {
+  http_code?: number; 
+  message: string;
+}
+
+type CloudinaryCallback = (error: CloudinaryError | null, result: CloudinaryDeleteResult | undefined) => void;
 
 // Configure Cloudinary
 cloudinary.config({
@@ -45,6 +50,8 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log('Attempting to delete file with public_id:', publicId);
+
     // Delete the file from Cloudinary
     const result = await new Promise<CloudinaryDeleteResult>((resolve, reject) => {
       cloudinary.uploader.destroy(
@@ -52,8 +59,14 @@ export async function POST(request: Request) {
         ((error, result) => {
           if (error) {
             console.error('Cloudinary deletion error details:', error);
-            reject(error);
+            // Check if the error is because the asset doesn't exist
+            if (error.http_code === 404) {
+              resolve({ result: 'not_found' });
+            } else {
+              reject(error);
+            }
           } else if (result) {
+            console.log('Cloudinary deletion result:', result);
             resolve(result as CloudinaryDeleteResult);
           } else {
             reject(new Error('No result from Cloudinary'));
@@ -62,10 +75,17 @@ export async function POST(request: Request) {
       );
     });
 
-    if (result.result === 'ok') {
-      return NextResponse.json({ success: true, message: 'File deleted successfully' }, { headers });
+    // Accept both 'ok' and 'not_found' as successful results
+    // 'not_found' means the file was already deleted or didn't exist
+    if (result.result === 'ok' || result.result === 'not_found') {
+      return NextResponse.json({ 
+        success: true, 
+        message: result.result === 'ok' ? 'File deleted successfully' : 'File was already deleted or does not exist',
+        result: result.result
+      }, { headers });
     } else {
-      throw new Error('Failed to delete file from Cloudinary');
+      console.error('Unexpected Cloudinary result:', result);
+      throw new Error(`Unexpected Cloudinary response: ${result.result}`);
     }
   } catch (error) {
     console.error('Error deleting from Cloudinary:', error);
