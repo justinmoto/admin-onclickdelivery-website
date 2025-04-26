@@ -1,17 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
+import { useState } from "react";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import usePlacesAutocomplete, {
   getGeocode,
   getLatLng,
 } from "use-places-autocomplete";
-import { Store } from "../lib/types";
 import { uploadFile } from "../lib/cloudinary";
 
-// Define libraries array as a static constant
-const libraries: ("places")[] = ["places"];
 
 interface FormState {
   id: number;
@@ -25,6 +21,7 @@ interface FormState {
   logo: File | null;
   longitude?: number;
   latitude?: number;
+  email?: string;
 }
 
 interface AddAddressModalProps {
@@ -246,7 +243,8 @@ export const AddAddressModal = ({
           logo_url: logo_url,
           location: form.address,
           longitude: form.longitude,
-          latitude: form.latitude
+          latitude: form.latitude,
+          email: form.email
         }),
       });
 
@@ -393,6 +391,7 @@ export const AddAddressModal = ({
                   setForm((prev) => ({ ...prev, category: e.target.value }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
+                required
               >
                 <option value="">Select a category</option>
                 {STORE_CATEGORIES.map((category) => (
@@ -401,6 +400,19 @@ export const AddAddressModal = ({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={form.email || ''}
+                onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
+                placeholder="Store email address"
+              />
             </div>
 
             <div className="space-y-4">
