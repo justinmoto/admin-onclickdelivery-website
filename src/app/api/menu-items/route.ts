@@ -39,8 +39,15 @@ export async function GET(request: NextRequest) {
               }
             );
         }
+
+        // Format the menu items to ensure proper price handling
+        const formattedMenuItems = rows.map(item => ({
+          ...item,
+          price: parseFloat(String(item.price))
+        }));
+
         return NextResponse.json(
-          { message: "Menu items fetched successfully", menuItems: rows }, 
+          { message: "Menu items fetched successfully", menuItems: formattedMenuItems }, 
           { 
             status: 200,
             headers: corsHeaders

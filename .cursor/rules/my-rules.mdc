@@ -1,0 +1,23 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+1. Programming Paradigms
+    - Prefer functional programming over object-oriented programming.
+    - Use declarative programming when it reduces code complexity and improves readability.
+    - Apply object-oriented design selectively, only when it improves maintainability, readability, and reduces complexity.
+
+2. File and Content Management
+    - On code changes, review and update the entire file where modifications occur, not just the changed lines.
+    - Maintain a code content outline and a call graph at the top of each file. Update these artifacts on every significant code change.
+
+3. Coding Standards
+    - All functions must have:
+        - Type hints for all parameters and return types.
+        - Doc-strings describing purpose, parameters, and return values.
+        - Unit tests validating functionality.
+
+4. Code Writing Discipline
+
+    - Refrain from code auto-completion in functions or sections where insufficient comments, type hints, or contextual code exist.

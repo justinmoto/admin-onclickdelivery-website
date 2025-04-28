@@ -24,6 +24,11 @@ export const AddProductModal = ({ isOpen, onClose, onSave, storeId }: AddProduct
         throw new Error('No store selected');
       }
 
+      const price = parseFloat(productPrice);
+      if (isNaN(price) || price <= 0) {
+        throw new Error('Please enter a valid price greater than 0');
+      }
+
       // Make API call to create menu item
       const response = await fetch(`/api/menu-items`, {
         method: 'POST',
@@ -32,7 +37,7 @@ export const AddProductModal = ({ isOpen, onClose, onSave, storeId }: AddProduct
         },
         body: JSON.stringify({
           name: productName,
-          price: parseFloat(productPrice),
+          price: price,
           store_id: storeId
         }),
       });
@@ -47,7 +52,7 @@ export const AddProductModal = ({ isOpen, onClose, onSave, storeId }: AddProduct
       
       onSave({
         name: productName,
-        price: parseFloat(productPrice) || 0
+        price: price
       });
       
       onClose();

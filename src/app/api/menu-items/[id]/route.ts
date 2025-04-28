@@ -30,13 +30,17 @@ export async function GET(
 
     const [rows] = await executeQuery<MenuItem>(
       pool,
-      'SELECT id, name, price, image_url, store_id, created_at, updated_at FROM menu_items WHERE id = ?',
+      'SELECT id, name, price, store_id, created_at, updated_at FROM menu_items WHERE id = ?',
       [id]
     );
 
     if (rows.length > 0) {
+      const menuItem = {
+        ...rows[0],
+        price: parseFloat(String(rows[0].price))
+      };
       return NextResponse.json(
-        { menuItem: rows[0] },
+        { menuItem },
         { headers: corsHeaders }
       );
     }
@@ -186,14 +190,19 @@ export async function PUT(
     // Get the updated menu item
     const [updatedItem] = await executeQuery<MenuItem>(
       pool,
-      'SELECT id, name, price, image_url, store_id, created_at, updated_at FROM menu_items WHERE id = ?',
+      'SELECT id, name, price, store_id, created_at, updated_at FROM menu_items WHERE id = ?',
       [id]
     );
+
+    const formattedItem = {
+      ...updatedItem[0],
+      price: parseFloat(String(updatedItem[0].price))
+    };
 
     return NextResponse.json(
       { 
         message: 'Menu item updated successfully',
-        menuItem: updatedItem[0]
+        menuItem: formattedItem
       },
       { 
         status: 200,

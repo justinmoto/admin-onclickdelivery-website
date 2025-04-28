@@ -167,7 +167,7 @@ export default function Addresses() {
         const validatedMenuItems = menuItems.map((item: ApiMenuItem) => ({
           id: item.id,
           name: item.name,
-          price: item.price,
+          price: parseFloat(String(item.price)),
           size: item.size || undefined,
           photo: item.image_url,
           image_url: item.image_url
@@ -401,7 +401,7 @@ export default function Addresses() {
       const validatedMenuItems = (data.menuItems || []).map((item: ApiMenuItem) => ({
         id: item.id,
         name: item.name,
-        price: item.price
+        price: parseFloat(String(item.price))
       }));
 
       setStores(prevStores => 
@@ -612,7 +612,7 @@ export default function Addresses() {
       const productToUpdate: Product = {
         id: updatedProduct.menuItem.id,
         name: updatedProduct.menuItem.name,
-        price: Number(updatedProduct.menuItem.price),
+        price: parseFloat(String(updatedProduct.menuItem.price)),
         store_id: selectedStore.id
       };
 
@@ -791,7 +791,7 @@ export default function Addresses() {
       for (const product of products) {
         try {
           // Ensure price is a valid number
-          const price = Number(product.price);
+          const price = parseFloat(String(product.price));
           if (isNaN(price)) {
             toast.error(`Invalid price for product: ${product.name}`);
             continue;
@@ -821,7 +821,7 @@ export default function Addresses() {
             const importedProduct: Product = {
               id: result.menuItem.id,
               name: result.menuItem.name,
-              price: Number(result.menuItem.price) || 0,
+              price: parseFloat(String(result.menuItem.price)),
               store_id: selectedStore.id
             };
             importedProducts.push(importedProduct);
@@ -1282,7 +1282,7 @@ export default function Addresses() {
                           </span>
                         </div>
                         <div className="col-span-3 text-sm text-gray-900">
-                          ₱{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
+                          ₱ {typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
                         </div>
                         <div className="col-span-1 text-right">
                           <div className="relative">
