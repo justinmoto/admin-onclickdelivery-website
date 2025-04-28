@@ -275,7 +275,7 @@ export default function Addresses() {
         setError(null);
         
         const url = `/api/stores`;
-        console.log('Fetching stores from:', url);
+        // console.log('Fetching stores from:', url);
         
         const response = await fetch(url, {
           method: 'GET',
@@ -291,7 +291,7 @@ export default function Addresses() {
         }
         
         const data = await response.json();
-        console.log('Received stores data:', data);
+        // console.log('Received stores data:', data);
         
         if (!data.stores || !Array.isArray(data.stores)) {
           console.error('Invalid response format:', data);
@@ -570,9 +570,21 @@ export default function Addresses() {
     showToast('Store added successfully!');
   };
 
-  const handleSaveDeliverySettings = (settings: DeliveryFare) => {
-    console.log('Saving delivery settings:', settings);
-    // Implementation for saving delivery settings
+  const handleSaveDeliverySettings = async (settings: DeliveryFare) => {
+    try {
+      const response = await fetch('/api/fare-rates/1', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      });
+      
+      if (!response.ok) throw new Error('Failed to save delivery settings');
+      showToast('Delivery settings updated successfully');
+      setIsDeliverySettingsModalOpen(false);
+    } catch (error) {
+      console.error('Error saving delivery settings:', error);
+      toast.error('Failed to save delivery settings');
+    }
   };
 
   const handleEditProduct = (index: number, product: Product) => {
