@@ -23,6 +23,7 @@ interface FormState {
   longitude?: number;
   latitude?: number;
   email?: string;
+  phone_number?: string;
 }
 
 interface AddAddressModalProps {
@@ -34,6 +35,8 @@ interface AddAddressModalProps {
     address: string;
     coordinates?: { lat: number; lng: number };
     logo?: File;
+    email?: string;
+    phone_number?: string;
   }) => void;
 }
 
@@ -245,7 +248,8 @@ export const AddAddressModal = ({
           location: form.address,
           longitude: form.longitude,
           latitude: form.latitude,
-          email: form.email
+          email: form.email,
+          phone_number: form.phone_number
         }),
       });
 
@@ -267,6 +271,8 @@ export const AddAddressModal = ({
         address: form.address || "",
         coordinates: form.coordinates,
         logo: form.logo instanceof File ? form.logo : undefined,
+        email: form.email,
+        phone_number: form.phone_number
       });
       
       onClose();
@@ -413,6 +419,19 @@ export const AddAddressModal = ({
                 onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
                 placeholder="Store email address"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={form.phone_number || ''}
+                onChange={(e) => setForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
+                placeholder="Store phone number"
               />
             </div>
 

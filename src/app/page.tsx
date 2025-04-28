@@ -28,6 +28,7 @@ interface Store {
   longitude: number;
   latitude: number;
   email?: string;
+  phone_number?: string;
 }
 
 interface DeliveryFare {
@@ -73,6 +74,7 @@ interface ApiStore {
   longitude: number;
   latitude: number;
   email?: string;
+  phone_number?: string;
 }
 
 export default function Addresses() {
@@ -550,6 +552,7 @@ export default function Addresses() {
     coordinates?: { lat: number; lng: number };
     logo?: File;
     email?: string;
+    phone_number?: string;
   }) => {
     // Find the highest existing ID in the stores array
     const highestId = stores.reduce((max, store) => Math.max(max, store.id), 0);
@@ -565,7 +568,8 @@ export default function Addresses() {
       menuPhotos: [],
       longitude: address.coordinates?.lng || 0,
       latitude: address.coordinates?.lat || 0,
-      email: address.email
+      email: address.email,
+      phone_number: address.phone_number
     };
 
     setStores(prevStores => [...prevStores, newStore]);
