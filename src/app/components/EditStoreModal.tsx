@@ -68,7 +68,9 @@ const STORE_CATEGORIES = [
 export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModalProps) => {
   const [form, setForm] = useState<Store & { logo?: File | null }>({
     ...store,
-    logo: null
+    logo: null,
+    email: store.email || '',
+    phone_number: store.phone_number || ''
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(store.logo_url || null);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,7 +92,12 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
   });
 
   useEffect(() => {
-    setForm({ ...store, logo: null });
+    setForm({
+      ...store,
+      logo: null,
+      email: store.email || '',
+      phone_number: store.phone_number || ''
+    });
     setLogoPreview(store.logo_url || null);
     setValue(store.location, false);
   }, [store, setValue]);
@@ -462,7 +469,7 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
               </label>
               <input
                 type="email"
-                value={form.email || ''}
+                value={form.email}
                 onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
                 placeholder="Store email address"
@@ -475,7 +482,7 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
               </label>
               <input
                 type="tel"
-                value={form.phone_number || ''}
+                value={form.phone_number}
                 onChange={(e) => setForm(prev => ({ ...prev, phone_number: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-gray-900"
                 placeholder="Store phone number"
