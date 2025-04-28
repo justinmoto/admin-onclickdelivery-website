@@ -471,27 +471,34 @@ export default function Addresses() {
         throw new Error('Photo not found in local state');
       }
 
-      // Extract public ID from Cloudinary URL
-      const matches = photo.url.match(/\/upload\/v\d+\/(.+)$/);
-      if (!matches) {
-        throw new Error('Invalid Cloudinary URL format');
+      // Only try to delete from Cloudinary if it's a Cloudinary URL
+      if (photo.url.includes('cloudinary.com')) {
+        try {
+          // Extract public ID from Cloudinary URL
+          const matches = photo.url.match(/\/upload\/v\d+\/(.+)$/);
+          if (matches) {
+            const publicId = matches[1].replace(/\.[^/.]+$/, ""); // Remove file extension
+
+            // Delete from Cloudinary
+            const cloudinaryResponse = await fetch(`/api/delete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ publicId })
+            });
+
+            if (!cloudinaryResponse.ok) {
+              console.error('Failed to delete photo from Cloudinary, continuing with database deletion');
+            }
+          }
+        } catch (cloudinaryError) {
+          console.error('Error deleting from Cloudinary:', cloudinaryError);
+          // Continue with database deletion even if Cloudinary deletion fails
+        }
       }
-      const publicId = matches[1].replace(/\.[^/.]+$/, ""); // Remove file extension
 
-      // Delete from Cloudinary first using this project's API
-      const cloudinaryResponse = await fetch(`/api/delete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ publicId })
-      });
-
-      if (!cloudinaryResponse.ok) {
-        throw new Error('Failed to delete photo from Cloudinary');
-      }
-
-      // Then delete from database using the other API
+      // Delete from database
       const deleteResponse = await fetch(`/api/menu-photos/${photoId}`, {
         method: 'DELETE',
         headers: {

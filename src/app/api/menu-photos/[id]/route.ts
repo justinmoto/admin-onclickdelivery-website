@@ -109,7 +109,10 @@ export async function DELETE(
           [id]
         );
 
-        if (result[0].affectedRows === 0) {
+        // In PostgreSQL, a successful DELETE returns an empty array
+        // In MySQL, it returns a ResultSetHeader with affectedRows
+        // We just need to ensure result exists
+        if (!result) {
             return NextResponse.json(
               { error: "Menu photo not found" }, 
               { 
