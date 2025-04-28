@@ -232,12 +232,10 @@ export const AddAddressModal = ({
       }
 
       // Make API call to create store
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      console.log('Making API call to:', `${apiUrl}/api/stores`);
+      console.log('Making API call to create store');
       
-      const response = await fetch(`${apiUrl}/api/stores`, {
+      const response = await fetch(`/api/stores`, {
         method: 'POST',
-        mode: 'no-cors',
         headers: {
           'Content-Type': 'application/json',
         },

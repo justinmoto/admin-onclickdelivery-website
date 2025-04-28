@@ -58,7 +58,7 @@ export const DeliverySettingsModal = ({ isOpen, onClose, onSave }: DeliverySetti
     e.preventDefault();
     try {
       setIsLoading(true);
-      const response = await fetch(`${apiUrl}/api/fare-rates/1`, {
+      const response = await fetch(`/api/fare-rates/1`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

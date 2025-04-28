@@ -50,29 +50,33 @@ export const AddMenuPhotosModal = ({ isOpen, onClose, onSave, storeId }: AddMenu
 
       const uploadedUrls = (await Promise.all(uploadPromises)).filter((url): url is string => url !== null);
 
-      // Make API calls to save each photo URL
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      const apiPromises = uploadedUrls.map(async (photo_url) => {
-        const response = await fetch(`${apiUrl}/api/menu-photos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            photo_url,
-            store_id: storeId
-          }),
-        });
+      // Upload each photo to the database
+      await Promise.all(
+        uploadedUrls.map(async (result, index) => {
+          try {
+            const response = await fetch(`/api/menu-photos`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                store_id: storeId,
+                photo_url: result,
+                thumbnail: result, // Using same URL for both full image and thumbnail
+              }),
+            });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to save menu photo');
-        }
-
-        return response.json();
-      });
-
-      await Promise.all(apiPromises);
+            if (!response.ok) {
+              console.error(`Failed to save menu photo ${index + 1}`);
+            }
+            
+            return response.json();
+          } catch (err) {
+            console.error(`Error saving menu photo ${index + 1}:`, err);
+            throw err;
+          }
+        })
+      );
 
       onSave(selectedPhotos);
       onClose();

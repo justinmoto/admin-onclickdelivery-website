@@ -9,6 +9,13 @@ import usePlacesAutocomplete, {
   getLatLng,
 } from "use-places-autocomplete";
 
+// Use the same Product type defined in parent component
+interface Product {
+  id: number;
+  name: string;
+  price: number;
+  store_id: number;
+}
 
 interface Store {
   id: number;
@@ -23,12 +30,6 @@ interface Store {
   menuPhotos?: MenuPhoto[];
   email?: string;
   phone_number?: string;
-}
-
-interface Product {
-  id: number;
-  name: string;
-  price: number;
 }
 
 interface MenuPhoto {
@@ -259,8 +260,7 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
         }
       }
 
-      // Make API call to update store using NEXT_PUBLIC_MYSQL_API_URL
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
+      // Make API call to update store
       const requestBody = {
         name: form.name,
         category: form.category,
@@ -274,7 +274,12 @@ export const EditStoreModal = ({ isOpen, onClose, onSave, store }: EditStoreModa
 
       console.log('Sending update request with body:', requestBody);
       
-      const response = await fetch(`${apiUrl}/api/stores/${store.id}`, {
+      // Ensure store.id is a valid number
+      if (!store.id) {
+        throw new Error('Invalid store ID');
+      }
+      
+      const response = await fetch(`/api/stores/${store.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

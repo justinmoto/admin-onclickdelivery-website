@@ -25,14 +25,7 @@ export const AddProductModal = ({ isOpen, onClose, onSave, storeId }: AddProduct
       }
 
       // Make API call to create menu item
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      console.log('Making API call to:', `${apiUrl}/api/menu-items`, {
-        name: productName,
-        price: parseFloat(productPrice),
-        store_id: storeId
-      });
-      
-      const response = await fetch(`${apiUrl}/api/menu-items`, {
+      const response = await fetch(`/api/menu-items`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

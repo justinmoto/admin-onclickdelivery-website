@@ -26,8 +26,7 @@ export const EditProductModal = ({ isOpen, onClose, onSave, product }: EditProdu
     setIsLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      const response = await fetch(`${apiUrl}/api/menu-items/${product.id}`, {
+      const response = await fetch(`/api/menu-items/${product.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

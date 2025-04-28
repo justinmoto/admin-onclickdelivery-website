@@ -119,8 +119,7 @@ export default function Addresses() {
 
       try {
         setError(null); // Clear any previous errors
-        const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-        const response = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
+        const response = await fetch(`/api/menu-items?store_id=${selectedStore.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -203,8 +202,7 @@ export default function Addresses() {
       if (!selectedStore?.id) return;
 
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-        const response = await fetch(`${apiUrl}/api/menu-photos?store_id=${selectedStore.id}`, {
+        const response = await fetch(`/api/menu-photos?store_id=${selectedStore.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -275,17 +273,8 @@ export default function Addresses() {
       try {
         setIsLoading(true);
         setError(null);
-        const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
         
-        // Log the API URL for debugging
-        // console.log('API URL from env:', apiUrl);
-        
-        if (!apiUrl) {
-          console.error('API URL is not configured in environment variables');
-          throw new Error('API URL is not configured');
-        }
-
-        const url = `${apiUrl}/api/stores`;
+        const url = `/api/stores`;
         console.log('Fetching stores from:', url);
         
         const response = await fetch(url, {
@@ -395,8 +384,7 @@ export default function Addresses() {
 
     // Refetch menu items to get the updated list from the server
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      const response = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
+      const response = await fetch(`/api/menu-items?store_id=${selectedStore.id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -476,8 +464,6 @@ export default function Addresses() {
 
     try {
       setIsDeletingPhoto(photoId); // Set loading state
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      console.log('Deleting photo with ID:', photoId);
 
       // Get photo URL from local state
       const photo = selectedStore.menuPhotos?.find(p => p.id === photoId);
@@ -506,7 +492,7 @@ export default function Addresses() {
       }
 
       // Then delete from database using the other API
-      const deleteResponse = await fetch(`${apiUrl}/api/menu-photos/${photoId}`, {
+      const deleteResponse = await fetch(`/api/menu-photos/${photoId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
@@ -604,8 +590,7 @@ export default function Addresses() {
     if (!selectedStore || !selectedProduct) return;
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      const response = await fetch(`${apiUrl}/api/menu-items/${selectedProduct.product.id}`, {
+      const response = await fetch(`/api/menu-items/${selectedProduct.product.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -674,9 +659,7 @@ export default function Addresses() {
     
     try {
       setIsDeletingProduct(productToDelete.product.id);
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      
-      const response = await fetch(`${apiUrl}/api/menu-items/${productToDelete.product.id}`, {
+      const response = await fetch(`/api/menu-items/${productToDelete.product.id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
@@ -748,8 +731,7 @@ export default function Addresses() {
       }
       
       // Then delete the store from the database
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-      const response = await fetch(`${apiUrl}/api/stores/${storeToDelete.id}`, {
+      const response = await fetch(`/api/stores/${storeToDelete.id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
@@ -782,23 +764,18 @@ export default function Addresses() {
     setOpenStoreMenuId(null);
   };
 
-  const handleSaveEditedStore = async (updatedStore: Store) => {
-    try {
-      // Only update the UI after successful API response from EditStoreModal
-      setStores(prevStores =>
-        prevStores.map(store =>
-          store.id === updatedStore.id ? updatedStore : store
-        )
-      );
-      if (selectedStore?.id === updatedStore.id) {
-        setSelectedStore(updatedStore);
-      }
-      setIsEditStoreModalOpen(false);
-      showToast('Store updated successfully!');
-    } catch (err) {
-      console.error('Error updating store:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to update store');
+  const handleSaveEditedStore = (updatedStore: Store) => {
+    // Only update the UI after successful API response from EditStoreModal
+    setStores(prevStores =>
+      prevStores.map(store =>
+        store.id === updatedStore.id ? updatedStore : store
+      )
+    );
+    if (selectedStore?.id === updatedStore.id) {
+      setSelectedStore(updatedStore);
     }
+    setIsEditStoreModalOpen(false);
+    showToast('Store updated successfully!');
   };
 
   const handleImportProducts = async (products: Array<{ name: string; price: number }>) => {
@@ -808,7 +785,6 @@ export default function Addresses() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
       const importedProducts: Array<Product> = [];
 
       // Add products one at a time
@@ -821,7 +797,7 @@ export default function Addresses() {
             continue;
           }
 
-          const response = await fetch(`${apiUrl}/api/menu-items`, {
+          const response = await fetch(`/api/menu-items`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -860,7 +836,7 @@ export default function Addresses() {
 
       if (importedProducts.length > 0) {
         // Fetch the updated menu items from the server
-        const menuItemsResponse = await fetch(`${apiUrl}/api/menu-items?store_id=${selectedStore.id}`, {
+        const menuItemsResponse = await fetch(`/api/menu-items?store_id=${selectedStore.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -930,11 +906,10 @@ export default function Addresses() {
     
     try {
       setIsDeletingBulk(true);
-      const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
       
       // Delete each selected product
       const deletePromises = Array.from(selectedProducts).map(productId =>
-        fetch(`${apiUrl}/api/menu-items/${productId}`, {
+        fetch(`/api/menu-items/${productId}`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json'
