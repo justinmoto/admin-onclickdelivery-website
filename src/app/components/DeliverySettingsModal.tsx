@@ -23,8 +23,6 @@ export const DeliverySettingsModal = ({ isOpen, onClose, onSave }: DeliverySetti
   const [exampleDistance, setExampleDistance] = useState<number | ''>(1);
   const [isLoading, setIsLoading] = useState(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_MYSQL_API_URL;
-
   useEffect(() => {
     if (isOpen) {
       fetchFareRates();
@@ -34,7 +32,7 @@ export const DeliverySettingsModal = ({ isOpen, onClose, onSave }: DeliverySetti
   const fetchFareRates = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${apiUrl}/api/fare-rates/1`);
+      const response = await fetch(`/api/fare-rates/1`);
       if (!response.ok) {
         throw new Error('Failed to fetch fare rates');
       }
@@ -48,10 +46,14 @@ export const DeliverySettingsModal = ({ isOpen, onClose, onSave }: DeliverySetti
     }
   };
 
-  const calculateTotalFare = (distance: number | '') => {
+  const calculateTotalFare = (distance: number | ''): number => {
     const { base_fare, rate_per_km, other_charges } = deliveryFare;
     const numericDistance = typeof distance === 'number' ? distance : 0;
-    return base_fare + (rate_per_km * numericDistance) + other_charges;
+    const numericBaseFare = Number(base_fare) || 0;
+    const numericRatePerKm = Number(rate_per_km) || 0;
+    const numericOtherCharges = Number(other_charges) || 0;
+    
+    return numericBaseFare + (numericRatePerKm * numericDistance) + numericOtherCharges;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

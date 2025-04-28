@@ -22,35 +22,24 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// Simple wrapper to ensure params are available
-async function processRequest(
-  id: string,
-  callback: (id: string) => Promise<NextResponse>
+// GET handler with typed params
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  try {
-    return await callback(id);
-  } catch (error) {
-    console.error("Error in request:", error);
+  const { id } = await context.params;
+  
+  if (!pool) {
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Database connection not configured" },
       {
         status: 500,
         headers: corsHeaders
       }
     );
   }
-}
 
-// GET handler with typed params
-export async function GET(
-  _request: NextRequest,
-  context: { params: { id: string } }
-) {
-  return processRequest(context.params.id, async (id) => {
-    if (!pool) {
-      throw new Error("Database connection not configured");
-    }
-
+  try {
     const [rows] = await executeQuery<FareRate>(
       pool,
       'SELECT id, base_fare, rate_per_km, other_charges, created_at, updated_at FROM fare_rates WHERE id = ?',
@@ -71,21 +60,36 @@ export async function GET(
         headers: corsHeaders
       }
     );
-  });
+  } catch (error) {
+    console.error("Error in GET request:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      {
+        status: 500,
+        headers: corsHeaders
+      }
+    );
+  }
 }
 
 // PUT handler with typed params
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const id = context.params.id;
-  
-  return processRequest(id, async (id) => {
-    if (!pool) {
-      throw new Error("Database connection not configured");
-    }
+  const { id } = await context.params;
 
+  if (!pool) {
+    return NextResponse.json(
+      { error: "Database connection not configured" },
+      {
+        status: 500,
+        headers: corsHeaders
+      }
+    );
+  }
+
+  try {
     const { base_fare, rate_per_km, other_charges } = await request.json();
 
     // Validate required fields
@@ -149,6 +153,15 @@ export async function PUT(
         headers: corsHeaders
       }
     );
-  });
+  } catch (error) {
+    console.error("Error in PUT request:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      {
+        status: 500,
+        headers: corsHeaders
+      }
+    );
+  }
 }
 
