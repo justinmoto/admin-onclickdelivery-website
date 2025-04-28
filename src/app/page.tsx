@@ -982,7 +982,7 @@ export default function Addresses() {
       </Head>
       <div className="min-h-screen flex bg-white relative">
         {/* Left Side - Store List */}
-        <div className="w-96 border-r border-gray-200">
+        <div className="w-96 border-r border-gray-200 flex flex-col">
           <div className="border-b border-gray-200">
             <div className="px-4 pt-4 pb-2">
               <h1 className="text-xl font-medium text-gray-900">Stores</h1>
@@ -1002,7 +1002,7 @@ export default function Addresses() {
               </button>
             </div>
           </div>
-          <div className="p-4">
+          <div className="p-4 border-b border-gray-200">
             <input
               type="text"
               placeholder="Search Addresses"
@@ -1011,21 +1011,27 @@ export default function Addresses() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="overflow-y-auto">
+          <div className="flex-1 overflow-y-auto">
             <div className="px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Name
+              Stores
             </div>
             {isLoading ? (
-              <div className="px-4 py-3 text-sm text-gray-600">Loading stores...</div>
+              <div className="px-4 py-3 text-sm text-gray-500">
+                Loading...
+              </div>
             ) : error ? (
-              <div className="px-4 py-3 text-sm text-red-600">{error}</div>
+              <div className="px-4 py-3 text-sm text-gray-500">
+                No stores available.
+              </div>
             ) : filteredStores.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-gray-600">No stores found</div>
+              <div className="px-4 py-3 text-sm text-gray-500">
+                {searchTerm ? 'No results found.' : 'No stores.'}
+              </div>
             ) : (
               filteredStores.map((store) => (
                 <div
                   key={store.id}
-                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between border-l-4 ${
+                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between border-l-4 relative ${
                     selectedStore?.id === store.id 
                       ? 'bg-gray-100 border-black' 
                       : 'border-transparent hover:border-gray-200'
@@ -1082,7 +1088,10 @@ export default function Addresses() {
                     </button>
                     {openStoreMenuId === store.id && (
                       <div 
-                        className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200"
+                        key={`menu-${store.id}`}
+                        id={`store-menu-${store.id}`}
+                        className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200"
+                        style={{ top: '100%' }}
                       >
                         <button
                           onClick={(e) => {
@@ -1096,7 +1105,9 @@ export default function Addresses() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteClick(0, store);
+                            setStoreToDelete(store);
+                            setIsDeleteModalOpen(true);
+                            setOpenStoreMenuId(null);
                           }}
                           className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left border-t border-gray-100"
                         >
