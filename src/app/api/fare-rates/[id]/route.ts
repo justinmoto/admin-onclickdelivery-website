@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { pool } from "../../../lib/db";
 import { executeQuery, getDatabaseMode } from "../../../lib/queryConverter";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
@@ -22,17 +22,34 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+// Simple wrapper to ensure params are available
+async function processRequest(
+  id: string,
+  callback: (id: string) => Promise<NextResponse>
 ) {
   try {
+    return await callback(id);
+  } catch (error) {
+    console.error("Error in request:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      {
+        status: 500,
+        headers: corsHeaders
+      }
+    );
+  }
+}
+
+// GET handler with typed params
+export async function GET(
+  _request: NextRequest,
+  context: { params: { id: string } }
+) {
+  return processRequest(context.params.id, async (id) => {
     if (!pool) {
       throw new Error("Database connection not configured");
     }
-
-    // Correctly handle params by making a copy
-    const { id } = await Promise.resolve(params);
 
     const [rows] = await executeQuery<FareRate>(
       pool,
@@ -49,34 +66,26 @@ export async function GET(
 
     return NextResponse.json(
       { error: 'Fare rate not found' },
-      { 
+      {
         status: 404,
         headers: corsHeaders
       }
     );
-  } catch (error) {
-    console.error("Error in GET request:", error);
-    return NextResponse.json(
-      { error: "Internal server error" }, 
-      { 
-        status: 500,
-        headers: corsHeaders
-      }
-    );
-  }
+  });
 }
 
+// PUT handler with typed params
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: { id: string } }
 ) {
-  try {
+  const id = context.params.id;
+  
+  return processRequest(id, async (id) => {
     if (!pool) {
       throw new Error("Database connection not configured");
     }
 
-    // Correctly handle params by making a copy
-    const { id } = await Promise.resolve(params);
     const { base_fare, rate_per_km, other_charges } = await request.json();
 
     // Validate required fields
@@ -100,7 +109,7 @@ export async function PUT(
     if (existingRate.length === 0) {
       return NextResponse.json(
         { error: 'Fare rate not found' },
-        { 
+        {
           status: 404,
           headers: corsHeaders
         }
@@ -131,7 +140,7 @@ export async function PUT(
     );
 
     return NextResponse.json(
-      { 
+      {
         message: "Fare rate updated successfully",
         fareRate: updatedRate[0]
       },
@@ -140,15 +149,6 @@ export async function PUT(
         headers: corsHeaders
       }
     );
-  } catch (error) {
-    console.error("Error in PUT request:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      {
-        status: 500,
-        headers: corsHeaders
-      }
-    );
-  }
+  });
 }
 
