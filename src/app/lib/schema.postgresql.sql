@@ -102,7 +102,9 @@ CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
-    NEW.created_at = OLD.created_at;  -- Preserve the original created_at timestamp
+    -- Explicitly preserve the original created_at timestamp
+    -- Do not modify the created_at field
+    NEW.created_at = OLD.created_at;
     RETURN NEW;
 END;
 $$ language 'plpgsql';

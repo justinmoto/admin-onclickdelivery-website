@@ -19,5 +19,4 @@ alwaysApply: true
         - Unit tests validating functionality.
 
 4. Code Writing Discipline
-
     - Refrain from code auto-completion in functions or sections where insufficient comments, type hints, or contextual code exist.

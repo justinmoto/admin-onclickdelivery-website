@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         
         const [rows] = await executeQuery<MenuItem>(
           pool,
-          "SELECT * FROM menu_items WHERE store_id = ?", 
+          "SELECT * FROM menu_items WHERE store_id = ? ORDER BY created_at DESC", 
           [store_id]
         );
 
@@ -43,7 +43,9 @@ export async function GET(request: NextRequest) {
         // Format the menu items to ensure proper price handling
         const formattedMenuItems = rows.map(item => ({
           ...item,
-          price: parseFloat(String(item.price))
+          price: parseFloat(String(item.price)),
+          created_at: item.created_at, // Ensure created_at is included in the response
+          updated_at: item.updated_at  // Keep updated_at for reference
         }));
 
         return NextResponse.json(

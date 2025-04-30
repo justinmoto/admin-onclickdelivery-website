@@ -97,4 +97,71 @@ export const handleDateTime = (date: Date | string, mode: DatabaseMode = getData
     return new Date(date).toISOString();
   }
   return date.toString();
-}; 
+};
+
+/**
+ * Interface for transaction query with parameters
+ */
+export interface TransactionQuery {
+  query: string;
+  values: unknown[];
+}
+
+/**
+ * Execute multiple queries in a single transaction
+ * 
+ * @param pool - Database connection pool
+ * @param queries - Array of query objects with SQL and parameters
+ * @param mode - Database mode (mysql or postgresql)
+ * @returns Results of the transaction
+ */
+export async function executeTransaction(
+  pool: PgPool | MySQLPool,
+  queries: TransactionQuery[],
+  mode: DatabaseMode = getDatabaseMode()
+): Promise<(QueryResult | ResultSetHeader)[]> {
+  if (mode === 'postgresql') {
+    const pgPool = pool as PgPool;
+    const client = await pgPool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      const results: QueryResult[] = [];
+      for (const { query, values } of queries) {
+        const pgQuery = convertToPostgresParams(query);
+        const result = await client.query(pgQuery, values);
+        results.push(result);
+      }
+      
+      await client.query('COMMIT');
+      return results;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } else {
+    const mysqlPool = pool as MySQLPool;
+    const connection = await mysqlPool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      const results: ResultSetHeader[] = [];
+      for (const { query, values } of queries) {
+        const [result] = await connection.query(query, values);
+        results.push(result as ResultSetHeader);
+      }
+      
+      await connection.commit();
+      return results;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+} 

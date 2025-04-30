@@ -17,7 +17,9 @@ export interface MenuItem extends RowDataPacket {
   id: number;
   name: string;
   price: number;
-  image_url: string;
+  image_url: string | null;
   store_id: number;
+  created_at: Date;
+  updated_at: Date;
 }
 

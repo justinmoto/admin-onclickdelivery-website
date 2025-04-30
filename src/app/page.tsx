@@ -44,6 +44,8 @@ interface Product {
   size?: string;
   image_url?: string;
   store_id: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface MenuPhoto {
@@ -58,6 +60,8 @@ interface ApiMenuItem {
   price: number;
   size?: string;
   image_url?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface ApiMenuPhoto {
@@ -170,7 +174,9 @@ export default function Addresses() {
           price: parseFloat(String(item.price)),
           size: item.size || undefined,
           photo: item.image_url,
-          image_url: item.image_url
+          image_url: item.image_url,
+          created_at: item.created_at,
+          updated_at: item.updated_at
         }));
 
         // console.log('Validated menu items:', validatedMenuItems);
@@ -797,106 +803,98 @@ export default function Addresses() {
     showToast('Store updated successfully!');
   };
 
-  const handleImportProducts = async (products: Array<{ name: string; price: number }>) => {
+  const handleImportProducts = async (products: Array<{ name: string; price: number; store_id?: number }>): Promise<boolean> => {
     try {
       if (!selectedStore) {
         toast.error('Please select a store first');
-        return;
+        return false;
       }
 
-      const importedProducts: Array<Product> = [];
+      // Validate all products before attempting to import
+      const invalidProducts = products.filter(product => {
+        const price = parseFloat(String(product.price));
+        return !product.name || isNaN(price) || price <= 0;
+      });
 
-      // Add products one at a time
-      for (const product of products) {
-        try {
-          // Ensure price is a valid number
-          const price = parseFloat(String(product.price));
-          if (isNaN(price)) {
-            toast.error(`Invalid price for product: ${product.name}`);
-            continue;
-          }
-
-          const response = await fetch(`/api/menu-items`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              name: product.name,
-              price: price,
-              store_id: selectedStore.id
-            }),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.text();
-            console.error('Error response:', errorData);
-            throw new Error(`Failed to import product: ${product.name}`);
-          }
-
-          const result = await response.json();
-          if (result.menuItem) {
-            // Ensure the imported product has a valid price
-            const importedProduct: Product = {
-              id: result.menuItem.id,
-              name: result.menuItem.name,
-              price: parseFloat(String(result.menuItem.price)),
-              store_id: selectedStore.id
-            };
-            importedProducts.push(importedProduct);
-          }
-        } catch (productError) {
-          console.error('Error importing product:', productError);
-          toast.error(`Failed to import: ${product.name}`);
-          // Continue with next product
-          continue;
-        }
+      if (invalidProducts.length > 0) {
+        toast.error(`Found ${invalidProducts.length} invalid products. Please check your data.`);
+        return false;
       }
 
-      if (importedProducts.length > 0) {
-        // Fetch the updated menu items from the server
-        const menuItemsResponse = await fetch(`/api/menu-items?store_id=${selectedStore.id}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-        });
+      // Store all products that need to be created
+      const productsToCreate = products.map(product => ({
+        name: product.name,
+        price: parseFloat(String(product.price)),
+        store_id: selectedStore.id
+      }));
 
-        if (!menuItemsResponse.ok) {
-          throw new Error('Failed to fetch updated menu items');
-        }
+      // Create all products in a single request to ensure atomic operation
+      const response = await fetch('/api/menu-items/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          products: productsToCreate,
+          store_id: selectedStore.id
+        }),
+      });
 
-        const menuItemsData = await menuItemsResponse.json();
-        const updatedMenuItems = menuItemsData.menuItems || [];
-
-        // Update the UI with the fresh data from the server
-        setStores(prevStores =>
-          prevStores.map(store =>
-            store.id === selectedStore.id
-              ? {
-                  ...store,
-                  products: updatedMenuItems
-                }
-              : store
-          )
-        );
-
-        setSelectedStore(prevStore => 
-          prevStore ? {
-            ...prevStore,
-            products: updatedMenuItems
-          } : null
-        );
-
-        toast.success(`Successfully imported ${importedProducts.length} products`);
-      } else {
-        toast.error('No products were imported successfully');
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Error response:', errorData);
+        toast.error('Failed to import products. Please try again.');
+        return false;
       }
+
+      const result = await response.json();
       
-      setIsImportExcelModalOpen(false);
+      if (!result.success) {
+        toast.error(result.message || 'Failed to import products');
+        return false;
+      }
+
+      // Fetch the updated menu items from the server
+      const menuItemsResponse = await fetch(`/api/menu-items?store_id=${selectedStore.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (!menuItemsResponse.ok) {
+        toast.error('Products were imported but failed to refresh the display');
+        return true; // Still return true as import succeeded
+      }
+
+      const menuItemsData = await menuItemsResponse.json();
+      const updatedMenuItems = menuItemsData.menuItems || [];
+
+      // Update the UI with the fresh data from the server
+      setStores(prevStores =>
+        prevStores.map(store =>
+          store.id === selectedStore.id
+            ? {
+                ...store,
+                products: updatedMenuItems
+              }
+            : store
+        )
+      );
+
+      setSelectedStore(prevStore => 
+        prevStore ? {
+          ...prevStore,
+          products: updatedMenuItems
+        } : null
+      );
+
+      toast.success(`Successfully imported ${result.importedCount || productsToCreate.length} products`);
+      return true;
     } catch (error) {
       console.error('Error importing products:', error);
       toast.error('Failed to import products. Please try again.');
+      return false;
     }
   };
 
@@ -1477,7 +1475,7 @@ export default function Addresses() {
         {isImportExcelModalOpen && selectedStore?.id && (
           <>
             <div 
-              className="fixed inset-0 bg-black/5 z-40"
+              className="fixed inset-0 bg-black/20 z-40"
               onClick={() => setIsImportExcelModalOpen(false)}
             />
             <ImportExcelModal
