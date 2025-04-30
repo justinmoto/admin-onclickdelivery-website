@@ -95,6 +95,7 @@ export default function Addresses() {
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMenuItemsLoading, setIsMenuItemsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState<number | null>(null);
@@ -122,6 +123,7 @@ export default function Addresses() {
       if (!selectedStore?.id) return;
 
       try {
+        setIsMenuItemsLoading(true);
         setError(null); // Clear any previous errors
         const response = await fetch(`/api/menu-items?store_id=${selectedStore.id}`, {
           method: 'GET',
@@ -153,20 +155,9 @@ export default function Addresses() {
         }
 
         const data = await response.json();
-        // console.log('Raw API Response:', data);
-        // console.log('Menu Items Structure:', data.menuItems ? data.menuItems[0] : 'No items');
-
         // If menuItems is null/undefined or empty array, set empty array
         const menuItems = data.menuItems || [];
         
-        // Debug log to check product data
-        // console.log('Menu items with photos:', menuItems.map((item: ApiMenuItem) => ({
-        //   id: item.id,
-        //   name: item.name,
-        //   photo: item.image_url,
-        //   photoUrl: item.image_url ? `Complete photo URL: ${item.image_url}` : 'No photo'
-        // })));
-
         // Ensure all required fields are present and photo URLs are properly formatted
         const validatedMenuItems = menuItems.map((item: ApiMenuItem) => ({
           id: item.id,
@@ -178,8 +169,6 @@ export default function Addresses() {
           created_at: item.created_at,
           updated_at: item.updated_at
         }));
-
-        // console.log('Validated menu items:', validatedMenuItems);
 
         // Update the selected store's products
         setSelectedStore(prevStore => {
@@ -201,6 +190,8 @@ export default function Addresses() {
       } catch (err) {
         console.error('Error fetching menu items:', err);
         setError('No products available');
+      } finally {
+        setIsMenuItemsLoading(false);
       }
     };
 
@@ -1275,7 +1266,13 @@ export default function Addresses() {
                     <div className="col-span-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Price</div>
                     <div className="col-span-1"></div>
                   </div>
-                  {selectedStore.products.length === 0 ? (
+
+                  {isMenuItemsLoading ? (
+                    <div className="py-12 flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-2"></div>
+                      <p className="text-sm text-gray-500">Loading menu items...</p>
+                    </div>
+                  ) : selectedStore.products.length === 0 ? (
                     <div className="py-8 text-center">
                       <p className="text-gray-500 text-sm">No products available</p>
                     </div>
